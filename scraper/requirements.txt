@@ -2,5 +2,8 @@ fastapi==0.163.0
 uvicorn[standard]
 pydantic>=2
 requests
+curl_cffi
+beautifulsoup4
+lxml
 pytest
 httpx
