@@ -5,7 +5,10 @@
 ### `GET /buscar?nome=`
 Resolve um nome de música para a URL canônica no Cifra Club (cobre a busca por nome de CAP-1).
 - Sucesso: retorna `cifra_club_url`.
-- Erro: HTTP 404 se a música não for encontrada.
+- Erro: HTTP 404 se a música não for encontrada (nenhum resultado `type: "song"`).
+- Erro: HTTP 400 se `nome` vier vazio ou só com espaços.
+- Erro: HTTP 502 em falha de rede/timeout na Solr do Cifra Club, ou em resposta com formato inesperado.
+- Todas as respostas de erro seguem `{ error: string }`.
 
 ### `POST /tons`
 Recebe `{ cifra_club_url }`; faz 12 requisições à URL do Cifra Club variando o parâmetro de tom.
