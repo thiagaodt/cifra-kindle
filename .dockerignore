@@ -1,0 +1,16 @@
+# Contexto de build da raiz (Dockerfile.dev da API). Evita copiar dependências
+# do host (Windows) para a imagem Linux e o front/scraper para dentro da API.
+node_modules
+.git
+.env
+.env.*
+!.env.example
+apps
+scraper
+_bmad
+_bmad-output
+.agents
+.claude
+dist
+coverage
+*.log

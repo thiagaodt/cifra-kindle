@@ -1,0 +1,144 @@
+# Ambiente de desenvolvimento local. MVP 100% localhost (C-14) — nada aqui é
+# o que roda em produção; não existe deploy em nuvem.
+#
+# Só o banco; API, front e scraper rodam no host (npm run dev / dev:web / scraper):
+#   npm run services:up     sobe o Postgres
+#   npm run services:down   derruba tudo (o volume com os dados permanece)
+#
+# Tudo em Docker com autoreload (perfil `app`: postgres, api, web, scraper):
+#   npm run docker:dev      sobe e fica sincronizando o código (Ctrl+C para o watch)
+#   npm run docker:down     derruba
+# O código entra nos containers pelo Compose Watch (`sync`), não por bind
+# mount: no Windows o bind mount não propaga eventos de arquivo e nem o
+# `tsx watch`, o Turbopack nem o `uvicorn --reload` recarregariam. Mudou
+# package.json/package-lock.json ou requirements.txt -> o watch refaz a imagem.
+#
+# Portas no host: front http://localhost:3010 - API http://localhost:3333 (/api/health)
+# - scraper http://localhost:8000 (/) - Postgres localhost:5433
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cifra
+      POSTGRES_PASSWORD: cifra
+      POSTGRES_DB: cifra_kindle_dev
+      TZ: UTC
+    ports:
+      # 5433 no host: a 5432 costuma estar ocupada por outra instância local.
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Cria o banco de teste (só roda na primeira criação do volume).
+      - ./scripts/docker/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cifra -d cifra_kindle_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # ── Perfil `app`: API, front e scraper com autoreload ────────────────────
+  # O .env da raiz (cp .env.example .env) entra MONTADO em /app/.env e é lido
+  # pelo dotenv (config/env.ts) toda vez que o processo sobe: reiniciar o
+  # container ou o próprio .env mudar já pega o valor novo.
+  # O `environment` abaixo vence o .env (o dotenv não sobrescreve): é só o que
+  # muda dentro da rede do compose — o banco é `postgres:5432`, não `localhost:5433`.
+  api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # Aplica as migrations pendentes antes de subir (idempotente; só em dev).
+    command: ["sh", "-c", "npm run migrate && npm run dev"]
+    volumes:
+      - type: bind
+        source: ./.env
+        target: /app/.env
+        read_only: true
+        # Sem .env o compose falha em vez de criar uma pasta `.env` vazia.
+        bind:
+          create_host_path: false
+    environment:
+      NODE_ENV: development
+      PORT: "3333"
+      DATABASE_URL: postgres://cifra:cifra@postgres:5432/cifra_kindle_dev
+      DATABASE_URL_TEST: postgres://cifra:cifra@postgres:5432/cifra_kindle_test
+      SCRAPER_BASE_URL: http://scraper:8000
+    ports:
+      - "${API_PORT:-3333}:3333"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3333/api/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - apps/
+            - scraper/
+        - action: rebuild
+          path: package.json
+        - action: rebuild
+          path: package-lock.json
+        # Mudou o .env -> reinicia a API, que relê o arquivo montado.
+        - action: restart
+          path: .env
+
+  web:
+    profiles: [app]
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    environment:
+      HOSTNAME: 0.0.0.0
+      # O front repassa /api/* para a API pela rede do compose (mesma origem para o navegador; NG-5).
+      API_PROXY_TARGET: http://api:3333
+    ports:
+      - "${WEB_PORT:-3010}:3010"
+    depends_on:
+      api:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/web
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./apps/web/package.json
+        - action: rebuild
+          path: ./apps/web/package-lock.json
+
+  scraper:
+    profiles: [app]
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${SCRAPER_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')\" || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    develop:
+      watch:
+        - action: sync
+          path: ./scraper
+          target: /app
+        - action: rebuild
+          path: ./scraper/requirements.txt
+
+volumes:
+  postgres_data:

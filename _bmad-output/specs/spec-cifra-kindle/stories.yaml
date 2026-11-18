@@ -1,0 +1,42 @@
+- id: "1"
+  title: Setup do projeto
+  description: >-
+    Scaffolding do ambiente: docker-compose.dev.yml com Postgres/Express/Next.js/FastAPI,
+    camadas Express/TS (routes/controllers/services/repositories/integrations) e skeleton
+    FastAPI, migrations das tabelas musicas e envios. Ver SPEC.md C-7, C-8, C-9, C-14.
+  spec_checkpoint: true
+  done_checkpoint: true
+
+- id: "2"
+  title: Buscar cifra por música
+  description: >-
+    Implementa CAP-1: GET /buscar no FastAPI (nome -> cifra_club_url) e a integração/
+    controller/service no Node que o consome. Ver SPEC.md C-1 e api-contracts.md.
+  spec_checkpoint: false
+  done_checkpoint: true
+
+- id: "3"
+  title: Transpor para os 12 tons
+  description: >-
+    Implementa CAP-2: POST /tons no FastAPI, retornando as 12 versões em sustenidos
+    com is_original marcado. Ver SPEC.md C-2, C-3 e api-contracts.md.
+  spec_checkpoint: false
+  done_checkpoint: true
+
+- id: "4"
+  title: Gerar Arquivo pronto (EPUB)
+  description: >-
+    Implementa CAP-3: EPUB reflowable com as 12 versões de tom ligadas por links internos,
+    abrindo no tom original, CSS monoespaçado preservando alinhamento acorde-sobre-sílaba.
+    Ver SPEC.md C-4, C-5.
+  spec_checkpoint: true
+  done_checkpoint: true
+
+- id: "5"
+  title: Enviar para o Kindle
+  description: >-
+    Implementa CAP-4: envio via SMTP/Send-to-Kindle do Arquivo pronto, persistência de
+    progresso em envios, e GET /envios/:id para a UI acompanhar. Ver SPEC.md C-6, C-9,
+    C-11, C-15 e api-contracts.md.
+  spec_checkpoint: false
+  done_checkpoint: true

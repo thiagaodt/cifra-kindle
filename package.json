@@ -1,0 +1,44 @@
+{
+    "name": "cifra-kindle",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Adaptador de Cifras para Kindle - projeto pessoal e solo de Thiago",
+    "main": "dist/server.js",
+    "scripts": {
+        "dev": "tsx watch server.ts",
+        "build": "tsc",
+        "start": "node dist/server.js",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "migrate": "tsx scripts/migrate.ts latest",
+        "migrate:status": "tsx scripts/migrate.ts status",
+        "migrate:rollback": "tsx scripts/migrate.ts rollback",
+        "migrate:make": "tsx scripts/migrate.ts make",
+        "services:up": "docker compose -p cifra-kindle -f docker-compose.dev.yml up -d",
+        "services:down": "docker compose -p cifra-kindle -f docker-compose.dev.yml --profile app down",
+        "docker:dev": "docker compose -p cifra-kindle -f docker-compose.dev.yml --profile app up --build --watch",
+        "docker:down": "docker compose -p cifra-kindle -f docker-compose.dev.yml --profile app down"
+    },
+    "engines": {
+        "node": ">=22"
+    },
+    "dependencies": {
+        "dotenv": "^16.4.5",
+        "express": "^5.3.0",
+        "jszip": "^3.10.2",
+        "knex": "^3.1.0",
+        "nodemailer": "^10.6.0",
+        "pg": "^8.23.1",
+        "zod": "^4.6.7"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.6",
+        "@types/node": "^22.10.0",
+        "@types/nodemailer": "^8.0.2",
+        "@types/pg": "^8.23.1",
+        "tsx": "^4.23.15",
+        "typescript": "^7.0.2",
+        "vitest": "^3.2.7"
+    }
+}

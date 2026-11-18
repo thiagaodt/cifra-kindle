@@ -1,0 +1,33 @@
+# Dependências e builds
+node_modules/
+dist/
+apps/web/.next/
+apps/web/out/
+*.tsbuildinfo
+
+# Ambiente e segredos
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+
+# Python (scraper/)
+scraper/__pycache__/
+scraper/**/__pycache__/
+scraper/.venv/
+scraper/venv/
+*.pyc
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Logs e temporários
+*.log
+npm-debug.log*
+coverage/
+tmp/
