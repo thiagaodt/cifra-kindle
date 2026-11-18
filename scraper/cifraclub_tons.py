@@ -13,7 +13,7 @@ Usa `curl_cffi` com `impersonate="chrome"` (fingerprint TLS; o host principal
 está atrás da Akamai). Sem Selenium/JS (AD-1/AD-2).
 """
 
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
@@ -21,6 +21,7 @@ from curl_cffi import requests
 REQUEST_TIMEOUT_SECONDS = 15
 HOST_PERMITIDO = "cifraclub.com.br"
 SCHEME_PERMITIDO = "https"
+MAX_REDIRECTS = 3
 
 NOTAS_EM_SUSTENIDO = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 # Tons que o Cifra Club pode exibir com bemol/enarmonia; convertidos para sustenido (C-3).
@@ -74,21 +75,42 @@ def _decompor_tom(texto: str) -> tuple[str, str]:
 
 
 def _buscar_soup(cifra_club_url: str, key_shape: int | None = None) -> BeautifulSoup:
-    """Faz a requisição e parseia o HTML uma única vez; o `soup` é reusado pelos extratores."""
+    """Faz a requisição e parseia o HTML uma única vez; o `soup` é reusado pelos extratores.
+
+    Redirects são seguidos manualmente (`allow_redirects=False`), revalidando o host de
+    cada `Location` contra `validar_url_cifra_club` — sem isso, um redirect poderia levar
+    a requisição pra fora do domínio permitido mesmo com a URL de entrada validada (SSRF).
+    """
+    url_atual = cifra_club_url
     params = None if key_shape is None else {"keyShape": key_shape}
     try:
-        resposta = requests.get(
-            cifra_club_url,
-            params=params,
-            impersonate="chrome",
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-        resposta.raise_for_status()
+        for _ in range(MAX_REDIRECTS + 1):
+            resposta = requests.get(
+                url_atual,
+                params=params,
+                impersonate="chrome",
+                timeout=REQUEST_TIMEOUT_SECONDS,
+                allow_redirects=False,
+            )
+            if 300 <= resposta.status_code < 400:
+                destino = resposta.headers.get("location")
+                if not destino:
+                    raise TonsIndisponiveisError(
+                        f"Cifra Club respondeu redirect sem 'Location' para {url_atual}."
+                    )
+                url_atual = urljoin(url_atual, destino)
+                validar_url_cifra_club(url_atual)
+                if urlsplit(url_atual).query:
+                    # o Location já embute sua própria query string; não duplicar/conflitar.
+                    params = None
+                continue
+            resposta.raise_for_status()
+            return BeautifulSoup(resposta.text, "lxml")
     except requests.RequestsError as erro:
         raise TonsIndisponiveisError(
             f"Cifra Club indisponível ao buscar tons de {cifra_club_url}: {erro}"
         ) from erro
-    return BeautifulSoup(resposta.text, "lxml")
+    raise TonsIndisponiveisError(f"Muitos redirects ao buscar tons de {cifra_club_url}.")
 
 
 def _extrair_tom(soup: BeautifulSoup) -> tuple[str, str]:

@@ -133,6 +133,7 @@ def test_original_igual_a_keyshape_zero_ainda_retorna_12_tons_distintos():
 
 def test_url_nao_resolve_retorna_502_sem_versions():
     resposta_404 = MagicMock()
+    resposta_404.status_code = 404
     resposta_404.raise_for_status.side_effect = requests.RequestsError("404 Not Found")
     with patch(GET_PATH, return_value=resposta_404):
         resp = client.post("/tons", json={"cifra_club_url": URL})
@@ -156,6 +157,7 @@ def test_falha_de_rede_no_meio_das_requisicoes_retorna_502_sem_parcial():
 def test_botao_de_tom_ausente_retorna_502():
     html_sem_botao = _html(None, _conteudo_para("F"))
     resposta = MagicMock()
+    resposta.status_code = 200
     resposta.raise_for_status.return_value = None
     resposta.text = html_sem_botao
     with patch(GET_PATH, return_value=resposta):
@@ -262,3 +264,62 @@ def test_validar_url_aceita_dominio_e_subdominio_https():
     validar_url_cifra_club("https://cifraclub.com.br/coldplay/the-scientist/")
     validar_url_cifra_club("https://www.cifraclub.com.br/coldplay/the-scientist/")
     validar_url_cifra_club("https://m.cifraclub.com.br/coldplay/the-scientist/")
+
+
+def _resposta_redirect(location: str) -> MagicMock:
+    resposta = MagicMock()
+    resposta.status_code = 302
+    resposta.headers = {"location": location}
+    return resposta
+
+
+def test_redirect_para_host_permitido_e_seguido_e_revalidado():
+    # Simula o redirect real observado (cifraclub.com.br -> www.cifraclub.com.br):
+    # toda chamada à URL sem "www." redireciona antes de chegar ao conteúdo.
+    url_bare = "https://cifraclub.com.br/coldplay/the-scientist/"
+    site = FakeCifraClub(tom_original="F", k_original=8)
+
+    def get_com_redirect(url, params=None, **kwargs):
+        if url == url_bare:
+            return _resposta_redirect(URL)
+        return site(url, params=params, **kwargs)
+
+    with patch(GET_PATH, side_effect=get_com_redirect):
+        versoes = obter_tons(url_bare)
+
+    assert len(versoes) == 12
+    assert sum(v["is_original"] for v in versoes) == 1
+
+
+def test_redirect_para_host_fora_do_dominio_e_rejeitado_sem_seguir():
+    with patch(GET_PATH, return_value=_resposta_redirect("https://evil.example.com/pwn")):
+        resp = client.post("/tons", json={"cifra_club_url": URL})
+
+    # a mesma validação de domínio da URL de entrada se aplica ao destino do redirect
+    assert resp.status_code == 400
+    assert "versions" not in resp.json()
+
+
+def test_redirect_sem_location_e_rejeitado():
+    resposta = MagicMock()
+    resposta.status_code = 302
+    resposta.headers = {}
+    with patch(GET_PATH, return_value=resposta):
+        resp = client.post("/tons", json={"cifra_club_url": URL})
+
+    assert resp.status_code == 502
+    assert "versions" not in resp.json()
+
+
+def test_muitos_redirects_em_cadeia_retorna_502():
+    chamada = {"n": 0}
+
+    def sempre_redireciona(url, params=None, **kwargs):
+        chamada["n"] += 1
+        return _resposta_redirect(f"https://www.cifraclub.com.br/loop-{chamada['n']}/")
+
+    with patch(GET_PATH, side_effect=sempre_redireciona):
+        resp = client.post("/tons", json={"cifra_club_url": URL})
+
+    assert resp.status_code == 502
+    assert "versions" not in resp.json()
