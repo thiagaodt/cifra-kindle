@@ -5,6 +5,12 @@ automaticamente para os 12 tons e receber um único EPUB navegável no Kindle
 via Send-to-Kindle. Ver `_bmad-output/specs/spec-cifra-kindle/SPEC.md` para o
 contrato completo (capabilities, constraints, non-goals).
 
+> **Uso pessoal e sem fins comerciais.** Este projeto não é afiliado ao Cifra Club nem à
+> Amazon. Ele busca, no momento do uso, cifras que você mesmo pediu, para leitura
+> pessoal no seu Kindle. Não armazena catálogo, não redistribui conteúdo e as fixtures de
+> teste têm a letra truncada. Quem usar é responsável por respeitar os Termos de Uso do
+> Cifra Club e os direitos autorais das músicas. Licença do código: [MIT](LICENSE).
+
 Esta story (1) entrega só o scaffolding: 4 serviços de pé (Postgres, Express,
 Next.js, FastAPI) com health checks, sem nenhuma rota de negócio ainda.
 

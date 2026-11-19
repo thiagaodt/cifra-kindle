@@ -50,7 +50,7 @@ context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{proje
 - `conventions.md` (companion) -- árvore de pastas alvo e nomenclatura já decididas; seguir à risca.
 - `stack.md` (companion) -- versões exatas de cada dependência.
 - `architecture-diagrams.md` (companion) -- portas por serviço e ER diagram de `musicas`/`envios`.
-- Referência de padrão, só leitura (projeto irmão do mesmo autor, fora deste repo, convenção mais recente): `projeto irmão\config\env.ts`, `database\db.ts`, `scripts\migrate.ts`, `knexfile.ts`, `app.ts`, `server.ts`, `docker-compose.dev.yml`, `Dockerfile.dev` -- adaptar removendo tudo de auth/JWT/CORS/multi-tenant/R2 (não existe aqui).
+- Referência de padrão, só leitura (projeto irmão do mesmo autor, fora deste repo, convenção mais recente): `config/env.ts`, `database/db.ts`, `scripts/migrate.ts`, `knexfile.ts`, `app.ts`, `server.ts`, `docker-compose.dev.yml`, `Dockerfile.dev` -- adaptar removendo tudo de auth/JWT/CORS/multi-tenant/R2 (não existe aqui).
 
 ## Tasks & Acceptance
 
