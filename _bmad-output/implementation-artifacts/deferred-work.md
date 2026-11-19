@@ -31,3 +31,15 @@
 - source_spec: `_bmad-output/specs/spec-cifra-kindle/SPEC.md`
   summary: Pendente: validar o envio real ao Kindle (CAP-3 e CAP-4 no aparelho), incluindo tom de abertura, links entre tons e alinhamento.
   evidence: Retrospectiva, item de ação 3. A verificação rodou só contra SMTP local descartável. Depende do Thiago: preencher `SMTP_USER`, `SMTP_PASS`, `KINDLE_EMAIL_TO` no `.env` e cadastrar o Approved Sender (C-11).
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/stories/5-enviar-para-o-kindle.md`
+  summary: Quando o pipeline falha antes de repontar `envios.musica_id`, a linha placeholder `pending:<uuid>` (com `tom_original` falso "C") permanece em `musicas`.
+  evidence: Visto no teste real de 2026-11-19 (falha de varchar(2) em Wonderwall): `select` em `musicas` mostrou uma linha `pending:…` órfã. O envio com erro precisa de um `musica_id` válido, então a linha não pode simplesmente sumir; opções: limpar placeholders de envios em `erro` ou tornar `musica_id` anulável.
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/stories/5-enviar-para-o-kindle.md`
+  summary: `envios.erro_mensagem` (exposto em `GET /api/envios/:id` como `erroMensagem`) devolve o texto cru do driver do banco, incluindo o SQL, em falhas de persistência.
+  evidence: Teste real de 2026-11-19: a mensagem trouxe o `insert into "musicas" ...` inteiro. Uso solo e localhost (C-14), sem risco imediato; vale sanitizar antes de qualquer exposição além do localhost.
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/stories/6-suporte-a-capotraste.md`
+  summary: Os testes do pipeline mockam os repositórios e não pegam restrições do banco (foi assim que `varchar(2)` em `tom_original` passou despercebido até o primeiro envio real com tom menor sustenido).
+  evidence: Corrigido pela migration `20261119000100_widen_musicas_tom_original.ts`. Falta um teste de integração contra o banco de teste (`DATABASE_URL_TEST`) que grave um tom como `F#m`.
