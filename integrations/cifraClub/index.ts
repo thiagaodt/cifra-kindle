@@ -121,11 +121,19 @@ function paraTonVersion(item: unknown): TonVersion {
     ) {
         throw new Error("Resposta inválida do serviço de scraping: versão de tom com campos ausentes ou inválidos.");
     }
+    let capotraste: number | null = null;
+    if ("capotraste" in item && item.capotraste !== null && item.capotraste !== undefined) {
+        if (typeof item.capotraste !== "number" || !Number.isInteger(item.capotraste) || item.capotraste <= 0) {
+            throw new Error("Resposta inválida do serviço de scraping: capotraste deve ser inteiro positivo ou null.");
+        }
+        capotraste = item.capotraste;
+    }
     return {
         tom: item.tom,
         semitoneOffset: item.semitone_offset,
         isOriginal: item.is_original,
         conteudo: item.conteudo,
+        capotraste,
     };
 }
 

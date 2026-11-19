@@ -37,7 +37,7 @@ Next.js, FastAPI) com health checks, sem nenhuma rota de negócio ainda.
    npm --prefix apps/web run dev
    ```
 
-5. Suba o scraper FastAPI (`:8000`) — veja `scraper/` (requer Python >=3.12):
+5. Suba o scraper FastAPI (`:8000`) — veja `scraper/` (requer Python 3.12; no Windows, veja a seção Solução de problemas abaixo):
 
    ```sh
    cd scraper
@@ -55,6 +55,61 @@ npm run docker:dev
 
 Front em `http://localhost:3010`, API em `http://localhost:3333/api/health`,
 scraper em `http://localhost:8000/`.
+
+## Solução de problemas
+
+### Scraper fora do Docker: versão do Python
+
+A imagem do scraper usa `python:3.12-slim` (ver `scraper/Dockerfile.dev`), então
+use Python 3.12 no venv local.
+
+Python 3.15 ainda não funciona: `uvicorn[standard]` puxa `pyyaml`, que não compila
+nessa versão, e `pip install -r requirements.txt` falha. O Docker não é afetado,
+porque usa a própria imagem Python.
+
+1. Crie o venv a partir da raiz do projeto (com Python 3.12 instalado no Windows):
+
+   ```powershell
+   py -3.12 -m venv scraper/.venv
+   ```
+
+2. Ative o venv:
+
+   ```powershell
+   scraper\.venv\Scripts\Activate.ps1
+   ```
+
+   No cmd, use `scraper\.venv\Scripts\activate.bat`. Se o PowerShell bloquear o
+   script, rode uma vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+3. Instale as dependências e suba o scraper:
+
+   ```powershell
+   cd scraper
+   pip install -r requirements.txt
+   uvicorn main:app --port 8000
+   ```
+
+**Contorno** se o `pip install -r requirements.txt` continuar falhando: instale
+as dependências sem o extra `[standard]` do uvicorn:
+
+```powershell
+pip install fastapi uvicorn "pydantic>=2" requests curl_cffi beautifulsoup4 lxml
+```
+
+Sem `uvicorn[standard]`, o `--reload` usa o StatReload, que detecta mudanças
+mais devagar.
+
+### BMAD: scripts com `uv`
+
+Os scripts do BMAD em `.claude/skills/*/scripts` rodam com `uv run`. Se o `uv`
+não estiver instalado, instale no PowerShell:
+
+```powershell
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Documentação: https://docs.astral.sh/uv/
 
 ## Verificação
 

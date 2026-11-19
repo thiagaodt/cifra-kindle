@@ -9,10 +9,16 @@ com dois pontos: a página sem parâmetro e `?keyShape=0`.
 Qualidade maior/menor (C-3): o sufixo `m` do botão de tom é preservado; só a
 letra é convertida para sustenido (ex.: `Bbm` -> `A#m`).
 
+Capotraste: o botão vem como `F#m(com forma de Em)`; o rótulo é o tom que soa
+(`F#m`). Verificado no site real (2026-11-19, Wonderwall e Fix You): o capo fica
+fixo entre os `keyShape` e o tom que soa continua subindo +1 semitom por
+`keyShape`, então a mesma calibração linear vale.
+
 Usa `curl_cffi` com `impersonate="chrome"` (fingerprint TLS; o host principal
 está atrás da Akamai). Sem Selenium/JS (AD-1/AD-2).
 """
 
+import re
 from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
@@ -37,6 +43,10 @@ SUBSTITUICOES_ENARMONICAS = {
     "B#": "C",
 }
 SUFIXO_MENOR = "m"
+# Texto do botão de tom: 'F', 'Bbm' ou, com capotraste, 'F#m(com forma de Em)' / 'E (com forma de C)'.
+PADRAO_TOM = re.compile(r"([A-G][#b]?)(m?)(?:\s*\(com forma de\s+[A-G][#b]?m?\))?")
+# Cifra Club redireciona para `<musica>/letra/` quando a página não tem cifra (só letra).
+SUFIXO_PAGINA_SO_LETRA = "/letra"
 # O Cifra Club insere U+200B no início das linhas do <pre> (anti-cópia); é invisível e não afeta alinhamento.
 CARACTERE_INVISIVEL = "​"
 
@@ -64,9 +74,15 @@ def validar_url_cifra_club(cifra_club_url: str) -> None:
 
 
 def _decompor_tom(texto: str) -> tuple[str, str]:
-    """Separa o texto do botão em (nota em sustenido, sufixo). Ex.: 'Bbm' -> ('A#', 'm'), 'F' -> ('F', '')."""
-    sufixo = SUFIXO_MENOR if texto.endswith(SUFIXO_MENOR) else ""
-    letra = texto[: len(texto) - len(sufixo)]
+    """Separa o texto do botão em (nota em sustenido, sufixo). Ex.: 'Bbm' -> ('A#', 'm'), 'F' -> ('F', '').
+
+    Com capotraste o botão vem como 'F#m(com forma de Em)': o rótulo é o tom que SOA
+    (a nota-base, 'F#m'); o trecho '(com forma de X)' é descartado.
+    """
+    casamento = PADRAO_TOM.fullmatch(texto.strip())
+    if casamento is None:
+        raise TonsIndisponiveisError(f"Tom não reconhecido no Cifra Club: {texto!r}.")
+    letra, sufixo = casamento.group(1), casamento.group(2)
     if letra in NOTAS_EM_SUSTENIDO:
         return letra, sufixo
     if letra in SUBSTITUICOES_ENARMONICAS:
@@ -100,6 +116,12 @@ def _buscar_soup(cifra_club_url: str, key_shape: int | None = None) -> Beautiful
                     )
                 url_atual = urljoin(url_atual, destino)
                 validar_url_cifra_club(url_atual)
+                if urlsplit(url_atual).path.rstrip("/").endswith(SUFIXO_PAGINA_SO_LETRA):
+                    raise TonsIndisponiveisError(
+                        f"O Cifra Club não tem cifra (acordes) para {cifra_club_url}: a página "
+                        f"redireciona para a versão só com letra ({url_atual}). "
+                        "Procure outra URL de cifra da mesma música."
+                    )
                 if urlsplit(url_atual).query:
                     # o Location já embute sua própria query string; não duplicar/conflitar.
                     params = None
@@ -118,6 +140,27 @@ def _extrair_tom(soup: BeautifulSoup) -> tuple[str, str]:
     if botao is None:
         raise TonsIndisponiveisError("Botão de tom não encontrado na página do Cifra Club.")
     return _decompor_tom(botao.get_text(strip=True))
+
+
+def _extrair_capotraste(soup: BeautifulSoup) -> int | None:
+    """Casa do capotraste (ex.: '2ª casa' -> 2) ou None quando a página não informa capo.
+
+    Botão ausente, ou texto 'sem capotraste', -> None. Botão presente sem número
+    reconhecível levanta erro: nunca esconder um capo.
+    """
+    botao = soup.find("button", attrs={"data-anchor": "--chord-capo"})
+    if botao is None:
+        return None
+    texto = botao.get_text(strip=True)
+    if re.search(r"\bsem\b", texto, re.IGNORECASE):
+        return None
+    casamento = re.search(r"(\d+)", texto)
+    if casamento is None:
+        raise TonsIndisponiveisError(f"Capotraste não reconhecido no Cifra Club: {texto!r}.")
+    casa = int(casamento.group(1))
+    if casa <= 0:
+        return None
+    return casa
 
 
 def _extrair_conteudo(soup: BeautifulSoup) -> str:
@@ -142,10 +185,13 @@ def obter_tons(cifra_club_url: str) -> list[dict]:
     soup_original = _buscar_soup(cifra_club_url)
     nota_original, sufixo = _extrair_tom(soup_original)
     conteudo_original = _extrair_conteudo(soup_original)
+    capotraste = _extrair_capotraste(soup_original)
 
     soup_zero = _buscar_soup(cifra_club_url, key_shape=0)
     nota_zero, sufixo_zero = _extrair_tom(soup_zero)
     conteudo_zero = _extrair_conteudo(soup_zero)
+    if _extrair_capotraste(soup_zero) != capotraste:
+        raise TonsIndisponiveisError("keyShape=0 mudou o capotraste em relação à página original.")
     if sufixo_zero != sufixo:
         raise TonsIndisponiveisError(
             "keyShape=0 mudou o modo (maior/menor) em relação à página original (calibração inconsistente)."
@@ -169,6 +215,8 @@ def obter_tons(cifra_club_url: str) -> list[dict]:
                 f"keyShape={key_shape} devolveu tom {nota_obtida}{sufixo_obtido}, "
                 f"esperado {NOTAS_EM_SUSTENIDO[indice]}{sufixo} (calibração inconsistente)."
             )
+        if _extrair_capotraste(soup) != capotraste:
+            raise TonsIndisponiveisError(f"keyShape={key_shape} mudou o capotraste em relação à página original.")
         versoes[indice] = _extrair_conteudo(soup)
 
     return [
@@ -177,6 +225,7 @@ def obter_tons(cifra_club_url: str) -> list[dict]:
             "semitone_offset": indice,
             "is_original": indice == indice_original,
             "conteudo": versoes[indice],
+            "capotraste": capotraste,
         }
         for indice in range(12)
     ]

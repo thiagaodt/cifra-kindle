@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
-import type { EnvioRecord } from "../repositories/envioRepository";
 import { obterEnvioPorId } from "../services/processarMusicaService";
+
+/** Registro de envio como devolvido pelo service (derivado do service; o controller não importa o repository, C-7). */
+type EnvioRecord = NonNullable<Awaited<ReturnType<typeof obterEnvioPorId>>>;
 
 /** Converte `EnvioRecord` (snake_case, vindo do banco) para a convenção camelCase da API (conventions.md). */
 function paraEnvioResponse(envio: EnvioRecord) {

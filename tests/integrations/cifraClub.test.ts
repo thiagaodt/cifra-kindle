@@ -79,13 +79,14 @@ describe("integrations/cifraClub.buscarMusica", () => {
 
 const CHROMATIC_TONES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 
-function scraperTonsBody(originalTone: string = "F") {
+function scraperTonsBody(originalTone: string = "F", capotraste?: number | null) {
     return {
         versions: CHROMATIC_TONES.map((tom, index) => ({
             tom,
             semitone_offset: index,
             is_original: tom === originalTone,
             conteudo: `${tom}        Dm7\n    letra no tom de ${tom}`,
+            ...(capotraste === undefined ? {} : { capotraste }),
         })),
     };
 }
@@ -122,7 +123,29 @@ describe("integrations/cifraClub.obterTons", () => {
             semitoneOffset: 5,
             isOriginal: true,
             conteudo: "F        Dm7\n    letra no tom de F",
+            capotraste: null,
         });
+    });
+
+    it("capotraste: mapeia o inteiro das 12 versões", async () => {
+        fetchMock.mockResolvedValueOnce(jsonResponse(200, scraperTonsBody("F", 2)));
+        const result = await obterTons("https://www.cifraclub.com.br/oasis/wonderwall/");
+        expect(result.map((version) => version.capotraste)).toEqual(Array(12).fill(2));
+    });
+
+    it("capotraste null explícito: mapeia para null", async () => {
+        fetchMock.mockResolvedValueOnce(jsonResponse(200, scraperTonsBody("F", null)));
+        const result = await obterTons("https://www.cifraclub.com.br/coldplay/the-scientist/");
+        expect(result.every((version) => version.capotraste === null)).toBe(true);
+    });
+
+    it("capotraste inválido (string/zero/fracionário): rejeita", async () => {
+        for (const invalido of ["2", 0, 1.5]) {
+            const body = scraperTonsBody("F", 2);
+            (body.versions[0] as Record<string, unknown>).capotraste = invalido;
+            fetchMock.mockResolvedValueOnce(jsonResponse(200, body));
+            await expect(obterTons("https://www.cifraclub.com.br/x/y/")).rejects.toThrow(/capotraste/);
+        }
     });
 
     it("FastAPI 502 com error: rejeita com a mensagem de erro, nunca resolve parcial", async () => {

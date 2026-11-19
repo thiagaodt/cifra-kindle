@@ -115,6 +115,12 @@ function buildTomXhtml(current: TonVersion, allVersions: TonVersion[]): string {
         })
         .join("\n");
 
+    // O capo é fixo entre os 12 tons; cada versão carrega o mesmo valor.
+    const capoLine =
+        current.capotraste != null
+            ? `    <span class="capotraste">Capotraste na ${escapeXml(String(current.capotraste))}ª casa — os acordes abaixo estão na forma, não no tom que soa</span>`
+            : null;
+
     return [
         '<?xml version="1.0" encoding="UTF-8"?>',
         "<!DOCTYPE html>",
@@ -128,6 +134,7 @@ function buildTomXhtml(current: TonVersion, allVersions: TonVersion[]): string {
         '  <nav class="tom-selector" aria-label="Trocar tom">',
         `    <span class="tom-atual">Tom atual: <strong>${currentLabel}</strong></span>`,
         otherLinks,
+        ...(capoLine ? [capoLine] : []),
         "  </nav>",
         `  <pre id="${rootId}" class="cifra-block">${escapeXml(current.conteudo)}</pre>`,
         "</body>",

@@ -150,4 +150,44 @@ describe("buildEpub", () => {
             "Canção de coração, fé &amp; esperança — manhã de sol &lt;3"
         );
     });
+
+    it("capotraste: cada página de tom mostra a linha de capo dentro de nav.tom-selector", async () => {
+        const versions = makeTwelveVersions("A").map((version) => ({ ...version, capotraste: 2 }));
+        const zip = await JSZip.loadAsync(await buildEpub(versions, { titulo: "Teste" }));
+
+        for (const tom of CHROMATIC_TONES) {
+            const xhtml = (await zip.file(`OEBPS/${toTomFilename(tom)}`)?.async("string")) as string;
+            const nav = xhtml.slice(xhtml.indexOf('<nav class="tom-selector"'), xhtml.indexOf("</nav>"));
+            expect(nav).toContain(
+                "Capotraste na 2ª casa — os acordes abaixo estão na forma, não no tom que soa"
+            );
+        }
+    });
+
+    it("sem capotraste (null ou ausente): nenhuma linha de capo e HTML idêntico ao de versões sem o campo", async () => {
+        const base = makeTwelveVersions("A");
+        const comNull = base.map((version) => ({ ...version, capotraste: null }));
+        const zipBase = await JSZip.loadAsync(await buildEpub(base, { titulo: "Teste" }));
+        const zipNull = await JSZip.loadAsync(await buildEpub(comNull, { titulo: "Teste" }));
+
+        const a = (await zipBase.file("OEBPS/tom-A.xhtml")?.async("string")) as string;
+        const b = (await zipNull.file("OEBPS/tom-A.xhtml")?.async("string")) as string;
+        expect(a).not.toContain("Capotraste");
+        expect(b).toBe(a);
+    });
+
+    it("capotraste: o valor é escapado como XML e o CSS monoespaçado (C-5) segue intacto", async () => {
+        const versions = makeTwelveVersions("A").map((version) => ({
+            ...version,
+            capotraste: "<2&>" as unknown as number,
+        }));
+        const zip = await JSZip.loadAsync(await buildEpub(versions, { titulo: "Teste" }));
+
+        const xhtml = (await zip.file("OEBPS/tom-A.xhtml")?.async("string")) as string;
+        expect(xhtml).toContain("Capotraste na &lt;2&amp;&gt;ª casa");
+        expect(xhtml).not.toContain("<2&>");
+        const css = (await zip.file("OEBPS/style.css")?.async("string")) as string;
+        expect(css).toContain("white-space: pre;");
+        expect(css).toContain("Courier New");
+    });
 });

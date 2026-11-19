@@ -199,7 +199,7 @@ def test_post_tons_happy_path_responde_formato_do_contrato():
     corpo = resp.json()
     assert set(corpo.keys()) == {"versions"}
     assert len(corpo["versions"]) == 12
-    assert set(corpo["versions"][0].keys()) == {"tom", "semitone_offset", "is_original", "conteudo"}
+    assert set(corpo["versions"][0].keys()) == {"tom", "semitone_offset", "is_original", "conteudo", "capotraste"}
 
 
 @pytest.mark.parametrize("corpo", [{}, {"cifra_club_url": "   "}, {"cifra_club_url": 42}])
