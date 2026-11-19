@@ -2,9 +2,9 @@
 title: 'Gerar Arquivo pronto (EPUB multi-tom)'
 type: 'feature'
 created: '2026-11-18'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{project-root}/_bmad-output/specs/spec-cifra-kindle/api-contracts.md', '{project-root}/_bmad-output/specs/spec-cifra-kindle/architecture-diagrams.md', '{project-root}/_bmad-output/specs/spec-cifra-kindle/conventions.md']
 ---
 
@@ -55,7 +55,7 @@ context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{proje
 **Execution:**
 - [x] `package.json` -- adicionar dependência `jszip` -- zip de baixo nível, com controle total sobre `mimetype` sem compressão e ordem do spine (bibliotecas de geração de EPUB prontas não dão esse controle fino)
 - [x] `interfaces/tonVersion.ts` -- `{ tom: string; semitoneOffset: number; isOriginal: boolean; conteudo: string }` -- tipo compartilhado com Stories 2/3/5
-- [x] `services/epubBuilder.ts` -- `buildEpub(versions: TonVersion[]): Promise<Buffer>`: valida exatamente 1 `isOriginal`; monta `mimetype`, `META-INF/container.xml`, `OEBPS/content.opf` (spine começando no original), `OEBPS/nav.xhtml`, `OEBPS/style.css`, `OEBPS/tom-<nome>.xhtml` x12 -- núcleo da story
+- [x] `services/epubBuilder.ts` -- `buildEpub(versions: TonVersion[], metadata: { titulo: string }): Promise<Buffer>`: valida exatamente 1 `isOriginal`; monta `mimetype`, `META-INF/container.xml`, `OEBPS/content.opf` (spine começando no original, `dc:identifier` único via `randomUUID()`, `dc:title` = `metadata.titulo`, `dcterms:modified` = horário real da chamada), `OEBPS/nav.xhtml`, `OEBPS/style.css`, `OEBPS/tom-<nome>.xhtml` x12 -- núcleo da story
 - [x] `tests/services/epubBuilder.test.ts` -- cobre as 4 linhas da I/O & Edge-Case Matrix -- nenhuma regressão silenciosa
 
 **Acceptance Criteria:**
@@ -70,7 +70,23 @@ context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{proje
 
 ## Spec Change Log
 
+- **`bad_spec` (2026-11-18):** Code Map/Tasks não exigiam que `buildEpub` recebesse identidade da música (título, identificador único) — causa raiz do `dc:identifier`/`dc:title`/`dcterms:modified` fixos entre músicas diferentes (ver Review Triage Log). KEEP: a estrutura de 12 XHTML + spine + nav + CSS permanece intacta, só a assinatura de `buildEpub` ganha um parâmetro de metadados. Amendado: `buildEpub(versions: TonVersion[], metadata: { titulo: string })`; `dc:identifier` passa a ser gerado via `randomUUID()` por chamada; `dc:title` usa `metadata.titulo`; `dcterms:modified` usa `new Date().toISOString()`.
+
 ## Review Triage Log
+
+Revisão formal (3 camadas: Blind Hunter + Edge Case Hunter + Verification Gap) rodada nesta sessão, retroativa ao código já implementado pela Antigravity. Verification Gap: nenhum gap encontrado.
+
+- **`medium` → `bad_spec`:** `dc:identifier` (`urn:uuid:00000000-...` fixo) e `dc:title` ("Cifra Multi-Tom" fixo) em `buildContentOpf` são idênticos em todo EPUB gerado, independente da música; `dcterms:modified` também é uma constante fixa. Verificado lendo `services/epubBuilder.ts:132-172`: `buildEpub` não recebe nenhum parâmetro de título/identidade da música. Consequência real: um leitor de EPUB (potencialmente o próprio Kindle) pode tratar EPUBs de músicas diferentes como "o mesmo livro" por compartilharem `dc:identifier`, arriscando que o envio de uma música nova substitua/confunda a anterior na biblioteca — contradiz CAP-4 ("trocar de música repete o mesmo fluxo"). Causa fora do bloco frozen (Code Map/Tasks não especificavam isso); corrigido nesta sessão sem precisar reabrir a Intent — ver Spec Change Log.
+- **`low` → `patch`:** nenhuma validação de que os 12 `tom` são únicos entre si antes de escrever no zip (`buildEpub`). Risco teórico apenas — rastreado e confirmado que `tom` é estruturalmente único por construção (Story 3 garante `semitoneOffset` ∈ {0..11} sem repetição e letra bijetiva ao índice), mas guarda defensiva é trivial e sem custo.
+- **`low` → `patch`:** `semitoneOffset` nunca é lido por `epubBuilder.ts` — a ordem do nav/manifest/links segue a ordem de entrada do array, não um sort explícito por `semitoneOffset`. Hoje sempre correto por acidente (o único produtor real já entrega ordenado), mas frágil a mudanças futuras upstream; sort defensivo é uma linha.
+- **`low` → `patch`:** `zip.generateAsync({ mimeType: EPUB_MIMETYPE })` — a opção `mimeType` só tem efeito com `type: "blob"`; com `"nodebuffer"` é configuração morta (o `mimetype` real do EPUB já é setado corretamente via `zip.file("mimetype", ...)` separado). Remoção é cosmética, zero risco.
+- **`false`:** "tom pode conter caractere XML-inseguro no href/id" e "tom duplicado corrompe o zip" — mesma causa raiz; refutado ao rastrear a cadeia completa Story 3 (Python) → `integrations/cifraClub` (Node): `tom` só pode ser um de 24 valores fixos (`NOTAS_EM_SUSTENIDO` ± sufixo `m`), nunca texto arbitrário.
+- **`false`:** "nada chama `buildEpub`" — verificado que `services/processarMusicaService.ts:57` (Story 5) já chama `buildEpub(versions)`; achado é artefato de revisar o diff da Story 4 isolado do resto do código.
+- **`false`:** "sem teste para `versions.length !== 12`" / "sem teste para tom duplicado" — o Verification Gap Reviewer já demonstrou (rastreando o único call site real) que `length !== 12` não tem caminho de regressão alcançável; tom duplicado é estruturalmente inalcançável (ver acima) — sem necessidade de teste para um guard que não existe.
+- **`false`:** `TonVersion.tom` tipado como `string` solto em vez de union literal — sem dano demonstrado, custo da correção (precisaria ir até o parsing do Python) maior que o benefício.
+- **`false`:** mistura PT/EN nos identificadores — convenção já estabelecida e consistente em todo o projeto (Stories 1-3), não um defeito desta story.
+- **`false`:** falta de doc comments em `TonVersion` — decoração, não defeito; nenhum consumidor real foi afetado por ambiguidade de formato.
+- **`false`:** `buildEpub` lança `Error` genérico sem distinguir 400/500 — moot: erros de `buildEpub` nunca chegam a uma resposta HTTP diretamente, só a `envios.erro_mensagem` (texto).
 
 ## Design Notes
 

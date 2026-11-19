@@ -28,6 +28,8 @@ vi.mock("../../integrations/kindleMail/sendToKindle", () => ({
     sendEpub: (...args: unknown[]) => mockSendEpub(...args),
 }));
 
+type EnvioResponse = { status: string; erroMensagem: string | null; musicaId: string };
+
 const musicasStore = new Map<string, MusicaRecord>();
 const enviosStore = new Map<string, EnvioRecord>();
 const statusTimeline = new Map<string, EnvioStatus[]>();
@@ -56,12 +58,16 @@ vi.mock("../../repositories/musicaRepository", () => {
     );
 
     const getById = vi.fn(async (id: string) => musicasStore.get(id));
+    const deleteById = vi.fn(async (id: string) => {
+        musicasStore.delete(id);
+    });
 
     return {
         upsertByCifraClubUrl,
         getById,
-        musicaRepository: { upsertByCifraClubUrl, getById },
-        default: { upsertByCifraClubUrl, getById },
+        deleteById,
+        musicaRepository: { upsertByCifraClubUrl, getById, deleteById },
+        default: { upsertByCifraClubUrl, getById, deleteById },
     };
 });
 
@@ -104,13 +110,18 @@ vi.mock("../../repositories/envioRepository", () => {
     );
 
     const getById = vi.fn(async (id: string) => enviosStore.get(id));
+    const updateMusicaId = vi.fn(async (id: string, musicaId: string) => {
+        const existing = enviosStore.get(id);
+        if (existing) existing.musica_id = musicaId;
+    });
 
     return {
         create,
         updateStatus,
+        updateMusicaId,
         getById,
-        envioRepository: { create, updateStatus, getById },
-        default: { create, updateStatus, getById },
+        envioRepository: { create, updateStatus, updateMusicaId, getById },
+        default: { create, updateStatus, updateMusicaId, getById },
     };
 });
 
@@ -184,9 +195,9 @@ describe("processarMusicaService + rotas POST /api/musicas e GET /api/envios/:id
 
             const getRes = await fetch(`${baseUrl}/api/envios/${body.envioId}`);
             expect(getRes.status).toBe(200);
-            const envio = (await getRes.json()) as EnvioRecord;
+            const envio = (await getRes.json()) as EnvioResponse;
             expect(envio.status).toBe("concluido");
-            expect(envio.erro_mensagem).toBeNull();
+            expect(envio.erroMensagem).toBeNull();
         });
     });
 
@@ -210,9 +221,9 @@ describe("processarMusicaService + rotas POST /api/musicas e GET /api/envios/:id
 
             const getRes = await fetch(`${baseUrl}/api/envios/${envioId}`);
             expect(getRes.status).toBe(200);
-            const envio = (await getRes.json()) as EnvioRecord;
+            const envio = (await getRes.json()) as EnvioResponse;
             expect(envio.status).toBe("erro");
-            expect(envio.erro_mensagem).toMatch(/Música não encontrada no Cifra Club/);
+            expect(envio.erroMensagem).toMatch(/Música não encontrada no Cifra Club/);
             expect(statusTimeline.get(envioId)).toEqual(["pendente", "buscando", "erro"]);
         });
     });
@@ -242,9 +253,9 @@ describe("processarMusicaService + rotas POST /api/musicas e GET /api/envios/:id
 
             const getRes = await fetch(`${baseUrl}/api/envios/${envioId}`);
             expect(getRes.status).toBe(200);
-            const envio = (await getRes.json()) as EnvioRecord;
+            const envio = (await getRes.json()) as EnvioResponse;
             expect(envio.status).toBe("erro");
-            expect(envio.erro_mensagem).toContain("SMTP error 550");
+            expect(envio.erroMensagem).toContain("SMTP error 550");
             expect(statusTimeline.get(envioId)).toEqual([
                 "pendente",
                 "buscando",
@@ -253,6 +264,77 @@ describe("processarMusicaService + rotas POST /api/musicas e GET /api/envios/:id
                 "enviando",
                 "erro",
             ]);
+        });
+    });
+
+    it("input por nome: repontar envios.musica_id para a música real e descartar o placeholder", async () => {
+        mockBuscarMusica.mockResolvedValue({
+            cifraClubUrl: "https://www.cifraclub.com.br/coldplay/yellow/",
+            nome: "Yellow",
+        });
+        mockObterTons.mockResolvedValue(makeFakeTons());
+        mockBuildEpub.mockResolvedValue(Buffer.from("epub"));
+        mockSendEpub.mockResolvedValue(undefined);
+
+        await withServer(async (baseUrl) => {
+            const postRes = await fetch(`${baseUrl}/api/musicas`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nome: "Yellow" }),
+            });
+            const { envioId } = (await postRes.json()) as { envioId: string };
+            await aguardarPipelineEnvio(envioId);
+
+            const envio = (await (
+                await fetch(`${baseUrl}/api/envios/${envioId}`)
+            ).json()) as EnvioResponse;
+            const musicas = [...musicasStore.values()];
+            expect(musicas).toHaveLength(1);
+            expect(musicas[0]?.cifra_club_url).toBe("https://www.cifraclub.com.br/coldplay/yellow/");
+            expect(envio.musicaId).toBe(musicas[0]?.id);
+        });
+    });
+
+    it("input por link: usa a URL direto em obterTons (sem buscarMusica) e conclui o envio", async () => {
+        const link = "https://www.cifraclub.com.br/coldplay/yellow/";
+        mockObterTons.mockResolvedValue(makeFakeTons());
+        mockBuildEpub.mockResolvedValue(Buffer.from("epub"));
+        mockSendEpub.mockResolvedValue(undefined);
+
+        await withServer(async (baseUrl) => {
+            const postRes = await fetch(`${baseUrl}/api/musicas`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ link }),
+            });
+            expect(postRes.status).toBe(202);
+            const { envioId } = (await postRes.json()) as { envioId: string };
+            await aguardarPipelineEnvio(envioId);
+
+            expect(mockBuscarMusica).not.toHaveBeenCalled();
+            expect(mockObterTons).toHaveBeenCalledWith(link);
+            const envio = (await (
+                await fetch(`${baseUrl}/api/envios/${envioId}`)
+            ).json()) as EnvioResponse;
+            expect(envio.status).toBe("concluido");
+        });
+    });
+
+    it("POST /api/musicas com corpo inválido: responde 400", async () => {
+        await withServer(async (baseUrl) => {
+            const res = await fetch(`${baseUrl}/api/musicas`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+            expect(res.status).toBe(400);
+        });
+    });
+
+    it("GET /api/envios/:id com id malformado: responde 400", async () => {
+        await withServer(async (baseUrl) => {
+            const res = await fetch(`${baseUrl}/api/envios/abc`);
+            expect(res.status).toBe(400);
         });
     });
 

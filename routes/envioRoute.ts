@@ -12,6 +12,7 @@ function validateEnvioIdParams(req: Request, res: Response, next: NextFunction):
         res.status(400).json({ error: message });
         return;
     }
+    req.params.id = parsed.data.id;
     next();
 }
 

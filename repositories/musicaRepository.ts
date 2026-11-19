@@ -43,9 +43,17 @@ export async function getById(
     return connection<MusicaRecord>("musicas").where({ id }).first();
 }
 
+export async function deleteById(
+    id: string,
+    connection: Knex = db
+): Promise<void> {
+    await connection<MusicaRecord>("musicas").where({ id }).delete();
+}
+
 export const musicaRepository = {
     upsertByCifraClubUrl,
     getById,
+    deleteById,
 };
 
 export default musicaRepository;

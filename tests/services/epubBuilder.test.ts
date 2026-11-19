@@ -30,7 +30,7 @@ function makeTwelveVersions(originalTone: string = "F#"): TonVersion[] {
 describe("buildEpub", () => {
     it("happy path: gera EPUB válido com mimetype sem compressão na primeira entrada, spine abrindo no tom original e links para os outros 11 tons", async () => {
         const versions = makeTwelveVersions("F#");
-        const buffer = await buildEpub(versions);
+        const buffer = await buildEpub(versions, { titulo: "Teste" });
 
         expect(Buffer.isBuffer(buffer)).toBe(true);
 
@@ -106,14 +106,14 @@ describe("buildEpub", () => {
             ...version,
             isOriginal: false,
         }));
-        await expect(buildEpub(noneOriginal)).rejects.toThrow(/isOriginal=true/);
+        await expect(buildEpub(noneOriginal, { titulo: "Teste" })).rejects.toThrow(/isOriginal=true/);
         expect(fileSpy).not.toHaveBeenCalled();
 
         const twoOriginals = makeTwelveVersions("C").map((version) => ({
             ...version,
             isOriginal: version.tom === "C" || version.tom === "G",
         }));
-        await expect(buildEpub(twoOriginals)).rejects.toThrow(/isOriginal=true/);
+        await expect(buildEpub(twoOriginals, { titulo: "Teste" })).rejects.toThrow(/isOriginal=true/);
         expect(fileSpy).not.toHaveBeenCalled();
 
         fileSpy.mockRestore();
@@ -124,7 +124,7 @@ describe("buildEpub", () => {
             version.tom === "D#" ? { ...version, conteudo: "" } : version
         );
 
-        const buffer = await buildEpub(versions);
+        const buffer = await buildEpub(versions, { titulo: "Teste" });
         const zip = await JSZip.loadAsync(buffer);
 
         const dSharpXhtml = await zip.file("OEBPS/tom-Dsharp.xhtml")?.async("string");
@@ -139,7 +139,7 @@ describe("buildEpub", () => {
             version.tom === "A" ? { ...version, conteudo: specialLyrics } : version
         );
 
-        const buffer = await buildEpub(versions);
+        const buffer = await buildEpub(versions, { titulo: "Teste" });
         const zip = await JSZip.loadAsync(buffer);
 
         const aXhtml = await zip.file("OEBPS/tom-A.xhtml")?.async("string");

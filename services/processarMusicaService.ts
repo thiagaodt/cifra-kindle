@@ -26,7 +26,8 @@ function toSafeFilename(title: string): string {
  */
 export async function executarPipelineEnvio(
     envioId: string,
-    input: MusicaInput
+    input: MusicaInput,
+    placeholderMusicaId?: string
 ): Promise<void> {
     try {
         await envioRepository.updateStatus(envioId, "buscando");
@@ -47,14 +48,23 @@ export async function executarPipelineEnvio(
         const original = versions.find((version) => version.isOriginal);
         const tomOriginal = original?.tom ?? "C";
 
-        await musicaRepository.upsertByCifraClubUrl({
+        const musica = await musicaRepository.upsertByCifraClubUrl({
             nome: nomeMusica,
             cifraClubUrl,
             tomOriginal,
         });
 
+        // `processarMusica` upsertou um placeholder (URL sintética) antes de resolver a URL real,
+        // pra poder responder `{ envioId }` na hora. Com a URL real em mãos, o upsert acima nunca
+        // bate no placeholder (URLs diferentes) e cria uma linha nova -- repontar o FK e descartar
+        // o placeholder evita órfãos em `musicas` e `envios.musica_id` apontando pra linha errada.
+        if (placeholderMusicaId && placeholderMusicaId !== musica.id) {
+            await envioRepository.updateMusicaId(envioId, musica.id);
+            await musicaRepository.deleteById(placeholderMusicaId);
+        }
+
         await envioRepository.updateStatus(envioId, "gerando");
-        const epubBuffer = await buildEpub(versions);
+        const epubBuffer = await buildEpub(versions, { titulo: nomeMusica });
 
         await envioRepository.updateStatus(envioId, "enviando");
         const filename = toSafeFilename(nomeMusica);
@@ -66,7 +76,16 @@ export async function executarPipelineEnvio(
             error instanceof Error && error.message
                 ? error.message
                 : "Erro desconhecido no processamento da música.";
-        await envioRepository.updateStatus(envioId, "erro", erroMensagem);
+        try {
+            await envioRepository.updateStatus(envioId, "erro", erroMensagem);
+        } catch (writeError) {
+            // Nunca deixa o pipeline rejeitar sem handler: `processarMusica` não aguarda essa
+            // promise, então uma rejeição aqui seria unhandled e poderia derrubar o processo.
+            console.error(
+                `[pipeline] falha ao gravar status de erro para envio ${envioId}:`,
+                writeError
+            );
+        }
     }
 }
 
@@ -91,7 +110,7 @@ export async function processarMusica(
         status: "pendente",
     });
 
-    const pipelinePromise = executarPipelineEnvio(envio.id, input).finally(() => {
+    const pipelinePromise = executarPipelineEnvio(envio.id, input, musica.id).finally(() => {
         pendingPipelines.delete(envio.id);
     });
     pendingPipelines.set(envio.id, pipelinePromise);

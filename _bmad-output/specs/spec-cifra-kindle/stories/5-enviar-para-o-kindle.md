@@ -2,9 +2,9 @@
 title: 'Enviar para o Kindle (orquestração completa + SMTP)'
 type: 'feature'
 created: '2026-11-18'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
-review_loop_iteration: 0
+review_loop_iteration: 1
 context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{project-root}/_bmad-output/specs/spec-cifra-kindle/api-contracts.md', '{project-root}/_bmad-output/specs/spec-cifra-kindle/architecture-diagrams.md', '{project-root}/_bmad-output/specs/spec-cifra-kindle/conventions.md']
 ---
 
@@ -79,6 +79,24 @@ context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{proje
 ## Spec Change Log
 
 ## Review Triage Log
+
+Revisão formal (3 camadas: Blind Hunter + Edge Case Hunter + Verification Gap) rodada nesta sessão, retroativa ao código já implementado pela Antigravity.
+
+- **`high` → `patch`:** `processarMusica` cria uma linha placeholder em `musicas` (`cifra_club_url = "pending:<uuid>"`) e aponta `envios.musica_id` pra ela antes do pipeline rodar. Quando o input é por `nome`, `executarPipelineEnvio` faz um segundo `upsertByCifraClubUrl` com a URL real (linha 50-54) — como a URL real nunca bate com o placeholder, o `onConflict("cifra_club_url")` nunca encontra a linha placeholder e insere uma linha nova e separada; `envios.musica_id` nunca é repontado pra ela. Confirmado lendo `services/processarMusicaService.ts:77-100` + `repositories/musicaRepository.ts:18-37`: toda busca por nome deixa (a) uma linha placeholder órfã em `musicas` para sempre e (b) `envios.musica_id` permanentemente apontando pra essa linha falsa, nunca pra linha com nome/tom reais. Achado independentemente por Blind Hunter, Edge Case Hunter e Verification Gap (com rastreio de evidência) nas duas stories — mesma causa raiz.
+- **`medium` → `patch`:** se o `catch` de `executarPipelineEnvio` (que grava `status=erro`) ele mesmo lançar (ex.: blip transitório de DB), a promise retornada rejeita; como `processarMusica` nunca aguarda `pipelinePromise` (só guarda em `pendingPipelines`, sem `.catch`), isso é uma unhandled rejection que pode derrubar o processo Node inteiro — não só aquele envio. Confirmado lendo `services/processarMusicaService.ts:64-69,94-97`; nenhum handler global de `unhandledRejection` existe em `server.ts`.
+- **`low` → `patch`:** `schemas/envioIdSchema.ts` valida só string não-vazia, sem `.uuid()`. Um id malformado (`GET /api/envios/abc`) passa a validação e quebra no Postgres com "invalid input syntax for type uuid", que o middleware de erro de `app.ts` transforma num `500` com a mensagem crua do driver, em vez de um `400` limpo. Achado por Edge Case Hunter + Verification Gap (evidência rastreada) + Blind Hunter.
+- **`low` → `patch`:** `routes/envioRoute.ts`'s `validateEnvioIdParams` nunca reatribui `req.params = parsed.data` (diferente de `musicaRoute`, que faz `req.body = parsed.data`) — um id com espaço em branco incidental passa a validação (que usa `.trim()`) mas chega não-trimado no controller/repository, podendo causar um "não encontrado" espúrio.
+- **`low` → `patch`:** sem teste cobrindo `POST /api/musicas` com corpo inválido (400 esperado) nem `GET /api/envios/:id` com id malformado (400 esperado depois do fix acima) — a lógica de validação já existe e funciona, só falta a cobertura.
+- **`medium` → `patch`:** `conventions.md` (companion da spec-kernel) declara "camelCase para arquivos/variáveis TS" para a camada de API; `controllers/envioController.ts` devolve `res.json(envio)` com o `EnvioRecord` cru do banco (`musica_id`, `erro_mensagem`, `enviado_em`, `criado_em`, `atualizado_em` em snake_case), violando essa convenção já documentada e consistente em outros pontos do código (ex.: `paraTonVersion` em `integrations/cifraClub` já faz esse mapeamento snake_case→camelCase).
+- **`medium` → `patch`:** Verification Gap Reviewer confirmou (com teste + rastreio) que o branch de `link` (em vez de `nome`) em `executarPipelineEnvio`/`processarMusica` não tem nenhum teste cobrindo — uma regressão isolada nesse branch (ex.: inverter a condição, ou enviar a URL errada pra `obterTons`) passaria despercebida pelos 4 testes existentes, que só exercitam o caminho por `nome`.
+- **`intent_gap`:** **[RESOLVIDO 2026-11-19: Thiago escolheu aceitar a URL como nome de exibição no caminho por link; sem mudança de código, registrado em deferred-work.]** quando o input é `link` (não `nome`), `nomeMusica` cai pra `input.link` — o nome literal da música gravado em `musicas.nome` e usado no filename do EPUB enviado ao Kindle vira a URL crua, não o título real da música. Verificado que o scraper (`scraper/main.py`) não tem nenhuma rota que extraia título a partir de uma URL direta — só `buscar_musica(nome)` resolve nome→URL. A Intent congelada da story diz "aceita `nome` OU `link`" como igualmente válidos, mas é silente sobre como derivar um nome legível quando só o link é dado — não há uma única leitura óbvia (aceitar a URL como nome de exibição vs. adicionar extração de título ao scraper são ambos razoáveis, com custos bem diferentes). Loop back para o Thiago — ver pergunta abaixo.
+- **`false`:** sem migrations/mount de rotas no diff revisado — artefato do escopo do diff que construí pra essa revisão (excluí `migrations/`, `app.ts`, `server.ts` por já pertencerem à Story 1); confirmado que ambos já existem e funcionam (`migrations/202611180001*`, `app.ts:14-15`).
+- **`false`:** `musicaSchema.link` aceita qualquer URL, não só `cifraclub.com.br` — sem risco de SSRF real: `obterTons` manda a URL pro scraper FastAPI, que já valida o host antes de qualquer requisição de rede (Story 3, `validar_url_cifra_club`) e responde 400 pra URL fora do domínio. Defesa já existe, só numa camada mais interna.
+- **`false`:** `typescript: "^7.0.2"` em `package.json` suspeito de erro de digitação — confirmado via `npm view typescript versions` que 7.0.2 é uma versão real publicada; `node_modules/typescript/package.json` já reflete essa versão instalada e `tsc --noEmit` roda limpo.
+- **`false`:** `nodemailer@^10.6.0` + `@types/nodemailer@^8.0.2` (major desalinhado) — `tsc --noEmit` limpo, nenhum dano demonstrado.
+- **`false`:** `processarMusica`/`executarPipelineEnvio` chamados diretamente (fora da rota) com `nome`/`link` undefined quebrariam as non-null assertions — inalcançável: o único chamador real (`musicaController.postMusica`) só recebe `req.body` depois do middleware Zod já ter garantido exatamente um dos dois presentes.
+- **`false`:** sem mecanismo de recuperação pra `envios` travados em status não-terminal se o processo cair — já é um trade-off conscientemente documentado nas Design Notes desta story ("sem fila dedicada... dado o uso solo e local, C-14"), não um defeito desta implementação.
+- **`defer`:** `config/env.ts`'s `toNumber` não rejeita valores negativos/`Infinity` (ex.: `PORT=-1`) — pré-existente da Story 1 (Story 5 só reusa o helper pra novas variáveis SMTP), não causado por esta story.
 
 ## Design Notes
 

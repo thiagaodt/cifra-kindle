@@ -1,7 +1,13 @@
+import { randomUUID } from "node:crypto";
 import JSZip from "jszip";
 import type { TonVersion } from "../interfaces/tonVersion";
 
 const EPUB_MIMETYPE = "application/epub+zip";
+
+export interface EpubMetadata {
+    /** Título real da música -- usado em `dc:title`, nunca um valor genérico fixo. */
+    titulo: string;
+}
 
 /**
  * Converte o nome do tom em sustenido (C, C#, D, ...) no sufixo de id/arquivo
@@ -129,7 +135,11 @@ function buildTomXhtml(current: TonVersion, allVersions: TonVersion[]): string {
     ].join("\n");
 }
 
-function buildContentOpf(versions: TonVersion[], original: TonVersion): string {
+function buildContentOpf(
+    versions: TonVersion[],
+    original: TonVersion,
+    metadata: EpubMetadata
+): string {
     const manifestItems = versions
         .map((version) => {
             const id = toTomId(version.tom);
@@ -150,14 +160,16 @@ function buildContentOpf(versions: TonVersion[], original: TonVersion): string {
         })
         .join("\n");
 
+    // `dc:identifier` único por chamada e `dcterms:modified` real -- um valor fixo faria leitores
+    // (potencialmente o próprio Kindle) tratarem EPUBs de músicas diferentes como "o mesmo livro".
     return [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="pt-BR">',
         '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
-        '    <dc:identifier id="book-id">urn:uuid:00000000-0000-4000-8000-000000000000</dc:identifier>',
-        "    <dc:title>Cifra Multi-Tom</dc:title>",
+        `    <dc:identifier id="book-id">urn:uuid:${randomUUID()}</dc:identifier>`,
+        `    <dc:title>${escapeXml(metadata.titulo)}</dc:title>`,
         "    <dc:language>pt-BR</dc:language>",
-        '    <meta property="dcterms:modified">2026-11-18T00:00:00Z</meta>',
+        `    <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z$/, "Z")}</meta>`,
         "  </metadata>",
         "  <manifest>",
         '    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
@@ -175,7 +187,10 @@ function buildContentOpf(versions: TonVersion[], original: TonVersion): string {
  * Monta em memória um EPUB reflowable válido com as 12 versões de tom,
  * abrindo no tom marcado como `isOriginal` e interligando cada tom aos outros 11.
  */
-export async function buildEpub(versions: TonVersion[]): Promise<Buffer> {
+export async function buildEpub(
+    versions: TonVersion[],
+    metadata: EpubMetadata
+): Promise<Buffer> {
     const originals = versions.filter((version) => version.isOriginal);
     if (originals.length !== 1) {
         throw new Error(
@@ -189,26 +204,30 @@ export async function buildEpub(versions: TonVersion[]): Promise<Buffer> {
         );
     }
 
+    if (new Set(versions.map((version) => version.tom)).size !== versions.length) {
+        throw new Error("Os 12 tons devem ser todos distintos entre si.");
+    }
+
     const original = originals[0]!;
+    // Defensivo: ordena por semitoneOffset antes de montar nav/manifest/links -- hoje o único
+    // produtor real já entrega ordenado, mas nada aqui dependia disso explicitamente.
+    const ordered = [...versions].sort((a, b) => a.semitoneOffset - b.semitoneOffset);
 
     const zip = new JSZip();
 
     // Requisito EPUB: `mimetype` deve ser a primeira entrada e sem compressão (STORE).
     zip.file("mimetype", EPUB_MIMETYPE, { compression: "STORE" });
     zip.file("META-INF/container.xml", buildContainerXml(), { compression: "DEFLATE" });
-    zip.file("OEBPS/content.opf", buildContentOpf(versions, original), { compression: "DEFLATE" });
-    zip.file("OEBPS/nav.xhtml", buildNavXhtml(versions), { compression: "DEFLATE" });
+    zip.file("OEBPS/content.opf", buildContentOpf(ordered, original, metadata), { compression: "DEFLATE" });
+    zip.file("OEBPS/nav.xhtml", buildNavXhtml(ordered), { compression: "DEFLATE" });
     zip.file("OEBPS/style.css", buildStyleCss(), { compression: "DEFLATE" });
 
-    for (const version of versions) {
+    for (const version of ordered) {
         const filename = toTomFilename(version.tom);
-        zip.file(`OEBPS/${filename}`, buildTomXhtml(version, versions), {
+        zip.file(`OEBPS/${filename}`, buildTomXhtml(version, ordered), {
             compression: "DEFLATE",
         });
     }
 
-    return zip.generateAsync({
-        type: "nodebuffer",
-        mimeType: EPUB_MIMETYPE,
-    });
+    return zip.generateAsync({ type: "nodebuffer" });
 }

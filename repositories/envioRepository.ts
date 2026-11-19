@@ -69,9 +69,21 @@ export async function getById(
     return connection<EnvioRecord>("envios").where({ id }).first();
 }
 
+/** Repointa `envios.musica_id` -- usado quando o upsert inicial (com URL placeholder) é substituído pela música real. */
+export async function updateMusicaId(
+    id: string,
+    musicaId: string,
+    connection: Knex = db
+): Promise<void> {
+    await connection<EnvioRecord>("envios")
+        .where({ id })
+        .update({ musica_id: musicaId, atualizado_em: connection.fn.now() });
+}
+
 export const envioRepository = {
     create,
     updateStatus,
+    updateMusicaId,
     getById,
 };
 
