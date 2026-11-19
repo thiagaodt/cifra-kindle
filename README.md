@@ -38,7 +38,7 @@ links internos.
 - **Back-end:** Node.js 22+, TypeScript, Express 5, Knex, Zod, jszip (EPUB), nodemailer (SMTP)
 - **Banco de dados:** PostgreSQL (Docker Compose, porta 5433)
 - **Scraper:** Python 3.12, FastAPI, `curl_cffi` (fingerprint TLS do Chrome), BeautifulSoup/lxml
-- **Front-end:** Next.js (App Router) em `apps/web`, ainda um placeholder
+- **Front-end:** Next.js 16 (App Router), React 19 e TypeScript em `apps/web`, CSS próprio, sem biblioteca de UI
 - **Testes:** Vitest (Node) e pytest (scraper)
 - **Validação do EPUB:** EPUBCheck 5.4.0 (W3C)
 
@@ -59,7 +59,7 @@ schemas/               # validação com Zod
 migrations/            # Knex
 scripts/               # migrate e epubcheck
 scraper/               # FastAPI: /buscar e /tons no Cifra Club
-apps/web/              # front-end Next.js
+apps/web/              # front-end Next.js (formulário e acompanhamento do envio)
 tests/                 # Vitest
 ```
 
@@ -152,6 +152,14 @@ npm run docker:dev
 
 Front em `http://localhost:3010`, API em `http://localhost:3333/api/health`, scraper em
 `http://localhost:8000/`.
+
+## Uso pela interface
+
+Com a API (`:3333`) e o front (`:3010`) no ar, abra `http://localhost:3010`, digite o nome da música ou cole
+um link do Cifra Club e clique em **Enviar ao Kindle**. A tela mostra o progresso do envio
+(na fila, buscando, transpondo, montando o EPUB, enviando) e a mensagem de erro quando algo falha. O front
+chama `/api/*` na mesma origem e o Next repassa para a API (`API_PROXY_TARGET`, padrão
+`http://localhost:3333`).
 
 ## Uso da API
 
@@ -255,7 +263,6 @@ dispositivo. Cifras reais têm a linha mais larga entre ~33 e ~60 colunas.
 - O rótulo de tom do Cifra Club às vezes discorda dos acordes impressos (ex.: Yellow, rótulo E, acordes em
   B). O projeto confia no rótulo.
 - Medleys sem cifra (o Cifra Club redireciona para `/letra/`) falham com mensagem clara.
-- O front-end ainda é um placeholder; hoje o uso é pela API.
 - Testado só em um Kindle básico de última geração. Outros modelos dependem de abrir os EPUBs de amostra no
   Kindle Previewer.
 
