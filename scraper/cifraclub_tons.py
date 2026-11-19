@@ -19,7 +19,7 @@ está atrás da Akamai). Sem Selenium/JS (AD-1/AD-2).
 """
 
 import re
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests
@@ -71,6 +71,16 @@ def validar_url_cifra_club(cifra_club_url: str) -> None:
         raise UrlInvalidaError("cifra_club_url deve usar https.")
     if host != HOST_PERMITIDO and not host.endswith("." + HOST_PERMITIDO):
         raise UrlInvalidaError(f"cifra_club_url deve ser do domínio {HOST_PERMITIDO}.")
+
+
+def _sem_query(cifra_club_url: str) -> str:
+    """Remove query string e fragmento da URL.
+
+    Links copiados de songbooks trazem `?songbookId=..&key=C`; o `key` força o tom e
+    faz o Cifra Club ignorar o `keyShape`, quebrando a calibração. Só o caminho importa.
+    """
+    partes = urlsplit(cifra_club_url)
+    return urlunsplit((partes.scheme, partes.netloc, partes.path, "", ""))
 
 
 def _decompor_tom(texto: str) -> tuple[str, str]:
@@ -181,6 +191,7 @@ def obter_tons(cifra_club_url: str) -> list[dict]:
     domínio) ou `TonsIndisponiveisError` (qualquer outra falha): nunca devolve lista parcial.
     """
     validar_url_cifra_club(cifra_club_url)
+    cifra_club_url = _sem_query(cifra_club_url)
 
     soup_original = _buscar_soup(cifra_club_url)
     nota_original, sufixo = _extrair_tom(soup_original)

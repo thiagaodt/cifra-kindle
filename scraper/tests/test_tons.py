@@ -100,6 +100,22 @@ def test_happy_path_retorna_12_versoes_com_uma_original():
     assert set(site.chamadas[1:]) == set(range(12)) - {8}
 
 
+def test_query_string_da_url_colada_e_descartada_antes_de_buscar():
+    # Links de songbook trazem `?songbookId=..&key=C`; o `key` faz o site ignorar o keyShape.
+    urls = []
+    site = FakeCifraClub(tom_original="C", k_original=3)
+
+    def espiao(url, params=None, **kwargs):
+        urls.append(url)
+        return site(url, params=params, **kwargs)
+
+    with patch(GET_PATH, side_effect=espiao):
+        versoes = obter_tons(URL + "?songbookId=23746927&key=C")
+
+    assert len(versoes) == 12
+    assert set(urls) == {URL}
+
+
 def test_conteudo_de_cada_versao_corresponde_ao_tom_da_propria_resposta():
     site = FakeCifraClub(tom_original="F", k_original=8)
     with patch(GET_PATH, side_effect=site):
