@@ -34,3 +34,6 @@ tmp/
 
 # Estado de runtime do Claude Code
 .claude/*.lock
+
+# Ferramentas baixadas localmente (EPUBCheck)
+tools/

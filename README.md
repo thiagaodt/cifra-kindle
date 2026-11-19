@@ -122,3 +122,21 @@ Documentação: https://docs.astral.sh/uv/
 
 Boot da API contra um Postgres sem migrations falha alto (nunca migra
 sozinho) — ver `database/migrationGuard.ts`.
+
+### Validar o EPUB (EPUBCheck)
+
+`npm run epubcheck` gera EPUBs sintéticos (sem capo, capo + tom menor com sustenido, linhas de
+60 e 80 colunas) e os valida com o EPUBCheck oficial do W3C. Falha com erro ou aviso inesperado;
+o aviso `NAV-011` (sumário em ordem cromática, spine abrindo no tom original) é aceito de propósito.
+
+Precisa de Java e do jar, que fica em `tools/` (ignorado pelo git):
+
+```bash
+gh release download v5.4.0 --repo w3c/epubcheck --pattern "epubcheck-5.4.0.zip" --dir tools/epubcheck
+cd tools/epubcheck && unzip epubcheck-5.4.0.zip
+```
+
+O EPUBCheck só valida a **estrutura**. Para ver como cada aparelho renderiza (largura de tela,
+corte de linha larga, fonte), abra os arquivos de `tools/epubcheck/amostras/` no
+[Kindle Previewer](https://www.amazon.com/Kindle-Previewer/b?node=21381691011) e escolha vários
+perfis de dispositivo. Cifras reais têm a linha mais larga entre ~33 e ~60 colunas.

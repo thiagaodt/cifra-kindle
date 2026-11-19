@@ -9,6 +9,7 @@
         "build": "tsc",
         "start": "node dist/server.js",
         "typecheck": "tsc --noEmit",
+        "epubcheck": "tsx scripts/epubcheck.ts",
         "test": "vitest run",
         "test:watch": "vitest",
         "migrate": "tsx scripts/migrate.ts latest",
