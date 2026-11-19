@@ -42,7 +42,7 @@ The PRD (§9) states: "OQ-1 (formato do Arquivo pronto), OQ-2 (mecanismo de tran
 
 ### 5. [Cosmetic] Mechanical nits
 - **AD field ordering inconsistency:** AD-1 orders its bullets Binds → Prevents → Rule; every other AD (AD-2 through AD-7) orders Binds → Rule → Prevents. Purely cosmetic, but worth normalizing for a document meant to be a stable reference pattern.
-- **Undefined jargon:** Design Paradigm section references "convencao pessoal do autor (projetos pessoais anteriores)" — this shorthand isn't defined anywhere in the spine or PRD. Presumably refers to prior personal projects/conventions, but as written it's opaque to anyone (including a future Thiago) without that context.
+- **Undefined jargon:** Design Paradigm section references "convencao pessoal do autor" — this shorthand isn't defined anywhere in the spine or PRD. Presumably refers to prior personal projects/conventions, but as written it's opaque to anyone (including a future Thiago) without that context.
 - Mermaid diagrams (both flowcharts and the `erDiagram`) all look syntactically valid, including the `[("...")]` cylinder/database node shape used twice and the `erDiagram` relationship cardinality `||--o{`.
 - AD IDs (AD-1 … AD-7) are sequential and not reused.
 - No empty or placeholder sections — Design Paradigm, Invariants & Rules, Consistency Conventions, Stack, Structural Seed, Capability → Architecture Map, and Deferred are all substantively filled in.

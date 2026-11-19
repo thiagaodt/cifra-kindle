@@ -108,8 +108,8 @@ dois runtimes de linguagem, banco relacional com migrations, e uma UI dedicada d
 envio" que nenhuma FR do PRD pede.
 
 Isso não contradiz nenhum Non-Goal explícito (o PRD não proíbe isso, só não pede), e o cabeçalho da spine marca
-AD-5/AD-6 como `[ADOPTED]` — sugerindo que vêm de convenção pessoal pré-existente do autor (citada como
-"projetos pessoais anteriores"), não de uma decisão nova motivada pelas FRs. Ainda assim, vale sinalizar: o tom do
+AD-5/AD-6 como `[ADOPTED]` — sugerindo que vêm de convenção pessoal pré-existente do autor (citada como "convenção pessoal do autor"
+), não de uma decisão nova motivada pelas FRs. Ainda assim, vale sinalizar: o tom do
 PRD é de mínimo indispensável para um projeto solo sem prazo, e a spine adiciona capacidade (UI de
 histórico/progresso) e complexidade operacional (multi-serviço, multi-linguagem, banco com schema) que vai além
 do que qualquer FR exige. Não é uma contradição factual — é um ponto que vale uma confirmação consciente de

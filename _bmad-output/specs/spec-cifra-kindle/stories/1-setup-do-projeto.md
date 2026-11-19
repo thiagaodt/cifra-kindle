@@ -15,7 +15,7 @@ context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{proje
 
 **Problem:** O repositório está vazio — não há código, containers nem schema de banco. As próximas 4 stories (buscar, transpor, gerar EPUB, enviar) dependem de uma base comum já de pé: camadas Express/TS, serviço FastAPI, Next.js, Postgres com migrations.
 
-**Approach:** Criar o scaffolding dos 4 serviços decididos na arquitetura (Express/TS, FastAPI, Next.js, Postgres), seguindo a convenção pessoal mais recente do autor (projeto `projeto irmão`, 11/11/2026): camadas unidirecionais, `config/env.ts` tipado, Knex com migrations de `musicas`/`envios`, `docker-compose.dev.yml` com perfil `app`, git inicializado. Nenhuma rota de negócio (FR-1 a FR-4) nesta story — só o esqueleto e health checks.
+**Approach:** Criar o scaffolding dos 4 serviços decididos na arquitetura (Express/TS, FastAPI, Next.js, Postgres), seguindo a convenção pessoal mais recente do autor (projeto irmão, 11/11/2026): camadas unidirecionais, `config/env.ts` tipado, Knex com migrations de `musicas`/`envios`, `docker-compose.dev.yml` com perfil `app`, git inicializado. Nenhuma rota de negócio (FR-1 a FR-4) nesta story — só o esqueleto e health checks.
 
 ## Boundaries & Constraints
 
@@ -24,7 +24,7 @@ context: ['{project-root}/_bmad-output/specs/spec-cifra-kindle/SPEC.md', '{proje
 - Camadas unidirecionais `routes → controllers → services → repositories/integrations` (SPEC.md C-7); todo corpo HTTP validado por Zod antes do controller (C-8).
 - Duas tabelas Postgres (`musicas`, `envios`) ligadas por `musica_id`; `status` de envio é `varchar` validado por enum Zod da aplicação, nunca enum nativo do Postgres (C-9); nenhuma das duas guarda a letra/cifra completa (C-10).
 - Portas fixas por `architecture-diagrams.md`: Next.js 3010, Express 3333, FastAPI 8000, Postgres 5433 (host).
-- `docker-compose.dev.yml` com perfil `app` (postgres fora do perfil; api/web/scraper dentro), replicando `projeto-irmao/docker-compose.dev.yml`.
+- `docker-compose.dev.yml` com perfil `app` (postgres fora do perfil; api/web/scraper dentro), replicando o `docker-compose.dev.yml` do projeto irmão.
 - MVP 100% localhost, sem deploy em nuvem (C-14).
 - Git inicializado com `.gitignore` cobrindo Node + Python + Next.js.
 

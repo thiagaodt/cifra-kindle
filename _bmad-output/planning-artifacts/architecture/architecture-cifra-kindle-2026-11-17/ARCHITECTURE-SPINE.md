@@ -17,7 +17,7 @@ companions: ['SOLUTION-DESIGN.md']
 
 ## Design Paradigm
 
-Pipeline em camadas: cada estagio do fluxo busca → transpoe → gera → envia mora numa camada/servico distinto (pipes-and-filters), dentro de uma organizacao MVC-like ratificada da convencao pessoal do autor (projetos pessoais anteriores: projetos pessoais anteriores):
+Pipeline em camadas: cada estagio do fluxo busca → transpoe → gera → envia mora numa camada/servico distinto (pipes-and-filters), dentro de uma organizacao MVC-like ratificada da convencao pessoal do autor (projetos pessoais anteriores):
 
 - `routes/` → `controllers/` — entrada HTTP, sem logica de negocio.
 - `services/` — orquestracao do pipeline (chama `repositories/` e `integrations/`).

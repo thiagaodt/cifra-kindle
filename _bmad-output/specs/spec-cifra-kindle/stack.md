@@ -4,7 +4,7 @@ Seed, não contrato: o código a assume uma vez que existir. Linhas com evidênc
 
 | Name | Version | Nota |
 | --- | --- | --- |
-| Node.js | >=22 | Bump consciente do floor >=20 dos projetos pessoais anteriores do autor (projetos pessoais anteriores) — Node 20 já fora de LTS. |
+| Node.js | >=22 | Bump consciente do floor >=20 dos projetos pessoais anteriores do autor — Node 20 já fora de LTS. |
 | TypeScript | ^7.0.2 | |
 | Express | ^5.x | Divergência consciente de Express 4, usado nos projetos anteriores do autor — Express 4 está em modo de manutenção/EOL. |
 | Knex | ^3.1.0 | Drizzle e Kysely considerados e descartados: familiaridade com a convenção pessoal do autor pesa mais que novidade num projeto solo. |

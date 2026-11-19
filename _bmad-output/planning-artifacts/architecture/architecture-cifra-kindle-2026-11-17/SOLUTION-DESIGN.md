@@ -35,7 +35,7 @@ A ideia de "bundlar múltiplos tons num arquivo só" já tinha aparecido na pesq
 
 ## 3. Visão Geral da Arquitetura
 
-O sistema é um **pipeline em camadas**: cada estágio do fluxo busca → transpõe → gera → envia é uma responsabilidade clara, isolada numa camada ou serviço. A organização interna do backend segue uma convenção MVC-like que o autor já usa em outros projetos pessoais (projetos pessoais anteriores) — reaproveitar essa convenção reduz risco de integração, concentrando a novidade real deste projeto (a peça em Python) numa única fronteira bem definida.
+O sistema é um **pipeline em camadas**: cada estágio do fluxo busca → transpõe → gera → envia é uma responsabilidade clara, isolada numa camada ou serviço. A organização interna do backend segue uma convenção MVC-like que o autor já usa em outros projetos pessoais — reaproveitar essa convenção reduz risco de integração, concentrando a novidade real deste projeto (a peça em Python) numa única fronteira bem definida.
 
 ```mermaid
 graph LR
