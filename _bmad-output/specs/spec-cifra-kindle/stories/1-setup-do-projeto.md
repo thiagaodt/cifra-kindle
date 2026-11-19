@@ -2,7 +2,7 @@
 title: 'Setup do projeto — scaffolding do ambiente'
 type: 'chore'
 created: '2026-11-18'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'NO_VCS'

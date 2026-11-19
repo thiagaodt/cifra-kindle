@@ -31,3 +31,6 @@ desktop.ini
 npm-debug.log*
 coverage/
 tmp/
+
+# Estado de runtime do Claude Code
+.claude/*.lock
