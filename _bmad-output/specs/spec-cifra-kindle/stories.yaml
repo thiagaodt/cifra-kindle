@@ -40,3 +40,12 @@
     C-11, C-15 e api-contracts.md.
   spec_checkpoint: false
   done_checkpoint: true
+
+- id: "6"
+  title: Suporte a capotraste
+  description: >-
+    Story de registro (retro do MVP, B1/B3): músicas com capotraste passam a funcionar
+    (rótulo = tom que soa, `capotraste` exposto em POST /tons e mostrado no EPUB) e
+    redirect para /letra/ vira erro 502 claro. Ver SPEC.md C-16 e api-contracts.md.
+  spec_checkpoint: false
+  done_checkpoint: true

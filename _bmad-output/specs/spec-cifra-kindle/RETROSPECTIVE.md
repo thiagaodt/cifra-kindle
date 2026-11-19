@@ -66,17 +66,17 @@ Nada a acompanhar: não existe retrospectiva anterior e não existe `sprint-stat
 
 Propostos, não aplicados. Remediações e reconciliações aguardam decisão humana.
 
-1. **Story 6 — suporte a capotraste** (fix now, bloqueia adoção). Aceitar `X(com forma de Y)` em `_decompor_tom`, com teste usando HTML real. Decidir antes qual tom vira o rótulo (ver Open questions). Dono: Thiago decide; dev loop executa. Fonte: B1.
-2. **Teste de contrato com HTML real do Cifra Club.** Fixtures gravadas (com e sem capotraste, ao menos) para `_extrair_tom`/`obter_tons`; fecha também o item cross-process de `deferred-work.md`. Dono: dev loop. Fonte: B1 (os testes passavam em fixtures escritas à mão e a classe de falha só apareceu rodando de verdade).
-3. **Validar no Kindle de verdade.** Preencher `SMTP_USER`, `SMTP_PASS`, `KINDLE_EMAIL_TO` no `.env`, cadastrar Approved Sender, enviar uma música e conferir tom de abertura, links e alinhamento. Dono: Thiago. Fonte: Verificação de comportamento.
-4. **Investigar B3** (`pais-e-filhos` sem botão de tom). Dono: dev loop. Fonte: B3.
-5. **Reconciliar o SPEC** (proposta, aplicada só por Thiago): acrescentar em C-3 a regra do rótulo de tom e uma restrição sobre capotraste; refletir em `api-contracts.md`. Fonte: A5.
-6. **Corrigir A1:** mover o tipo da resposta para `interfaces/` ou usar `ReturnType` do mapper, sem importar `repositories/` no controller. Dono: dev loop. Fonte: A1.
-7. **Registrar A2** em `deferred-work.md`: busca sem a validação de host/redirect da Story 3.
-8. **Lição de processo — baseline obrigatório.** Stories 1, 4 e 5 não têm faixa de diff; a revisão foi retroativa e achou um defeito `high`. Exigir `baseline_commit` real antes de despachar para outra ferramenta (Antigravity) e rodar o review antes do commit-baseline. Dono: Thiago. Fonte: frontmatters das stories 1, 4, 5; `git log`.
-9. **Lição de processo — verificação real por story.** Cada story foi aceita só com testes sobre fixtures; o primeiro uso real revelou B1 e B2. Incluir um passo de "rodar contra o serviço real" no critério de pronto das stories de scraping. Dono: Thiago. Fonte: B1, B2.
-10. **Ambiente:** `scraper/requirements.txt` usa `uvicorn[standard]`, que puxa `pyyaml` e não instala no Python 3.15; `uv` não está instalado (scripts do BMAD usam `uv run`). Fixar versão de Python suportada ou ajustar o requirements. Fonte: instalação do venv desta sessão.
-11. **Higiene:** `apps/web/package.json` ganhou `"cifra-kindle": "file:../.."` sem origem conhecida; revertido nesta sessão. Se reaparecer, achar quem roda `npm install` com esse alvo. Fonte: `git diff` antes do revert.
+1. **Story 6 — suporte a capotraste** (fix now, bloqueia adoção). Aceitar `X(com forma de Y)` em `_decompor_tom`, com teste usando HTML real. Decidir antes qual tom vira o rótulo (ver Open questions). Dono: Thiago decide; dev loop executa. Fonte: B1. — **feito, ver Story 6**
+2. **Teste de contrato com HTML real do Cifra Club.** Fixtures gravadas (com e sem capotraste, ao menos) para `_extrair_tom`/`obter_tons`; fecha também o item cross-process de `deferred-work.md`. Dono: dev loop. Fonte: B1 (os testes passavam em fixtures escritas à mão e a classe de falha só apareceu rodando de verdade). — **feito, ver Story 6**
+3. **Validar no Kindle de verdade.** Preencher `SMTP_USER`, `SMTP_PASS`, `KINDLE_EMAIL_TO` no `.env`, cadastrar Approved Sender, enviar uma música e conferir tom de abertura, links e alinhamento. Dono: Thiago. Fonte: Verificação de comportamento. — **pendente (depende do Thiago)**
+4. **Investigar B3** (`pais-e-filhos` sem botão de tom). Dono: dev loop. Fonte: B3. — **feito, ver Story 6**
+5. **Reconciliar o SPEC** (proposta, aplicada só por Thiago): acrescentar em C-3 a regra do rótulo de tom e uma restrição sobre capotraste; refletir em `api-contracts.md`. Fonte: A5. — **feito (2026-11-19)**
+6. **Corrigir A1:** mover o tipo da resposta para `interfaces/` ou usar `ReturnType` do mapper, sem importar `repositories/` no controller. Dono: dev loop. Fonte: A1. — **feito (2026-11-19)**
+7. **Registrar A2** em `deferred-work.md`: busca sem a validação de host/redirect da Story 3. — **feito (2026-11-19)**
+8. **Lição de processo — baseline obrigatório.** Stories 1, 4 e 5 não têm faixa de diff; a revisão foi retroativa e achou um defeito `high`. Exigir `baseline_commit` real antes de despachar para outra ferramenta (Antigravity) e rodar o review antes do commit-baseline. Dono: Thiago. Fonte: frontmatters das stories 1, 4, 5; `git log`. — **feito (2026-11-19)**
+9. **Lição de processo — verificação real por story.** Cada story foi aceita só com testes sobre fixtures; o primeiro uso real revelou B1 e B2. Incluir um passo de "rodar contra o serviço real" no critério de pronto das stories de scraping. Dono: Thiago. Fonte: B1, B2. — **feito (2026-11-19)**
+10. **Ambiente:** `scraper/requirements.txt` usa `uvicorn[standard]`, que puxa `pyyaml` e não instala no Python 3.15; `uv` não está instalado (scripts do BMAD usam `uv run`). Fixar versão de Python suportada ou ajustar o requirements. Fonte: instalação do venv desta sessão. — **feito (2026-11-19)**
+11. **Higiene:** `apps/web/package.json` ganhou `"cifra-kindle": "file:../.."` sem origem conhecida; revertido nesta sessão. Se reaparecer, achar quem roda `npm install` com esse alvo. Fonte: `git diff` antes do revert. — **feito (2026-11-19)**
 
 ## Acceptance verdict
 
@@ -96,6 +96,10 @@ Por que não "accepted": CAP-2 é parcial e CAP-3/CAP-4 dependem do aparelho. Po
 1. **Qual tom é o rótulo quando há capotraste?** O tom que soa (E) ou a forma dos acordes impressos (C com capo na 4ª casa)? Muda a navegação entre tons e o que o músico enxerga no Kindle.
 2. **Rótulo errado de origem (B2):** aceitar o rótulo do Cifra Club como verdade (C-3 atual), ou derivar/validar o tom a partir dos acordes e avisar quando divergirem?
 3. **B3:** a página realmente não tem botão ou o Cifra Club bloqueou a requisição?
+
+Respondidas por delegação em 2026-11-19: (1) rótulo = tom que soa, com capotraste exibido; (2) confiar no rótulo do Cifra Club (C-3), limitação documentada. O Thiago pode sobrescrever.
+
+Nota: o veredito acima (Acceptance verdict) reflete o estado ANTES dessas correções; permanece como registrado.
 
 ## Assumptions
 

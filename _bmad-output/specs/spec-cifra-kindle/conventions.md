@@ -34,3 +34,8 @@ cifra-kindle/
 ```
 
 Ambiente de desenvolvimento local: os 4 serviços (Postgres, Express API, Next.js, FastAPI) sobem juntos via `docker-compose.dev.yml` (perfil `app`), com um único `.env`/`.env.example` na raiz compartilhado pelos serviços Node; o FastAPI lê suas próprias variáveis via `.env` equivalente em `scraper/`.
+
+## Regras de processo
+
+- Toda story despachada para outra ferramenta (ex.: Antigravity) exige `baseline_commit` real registrado antes do despacho e revisão antes do commit-baseline; sem faixa de diff a revisão vira retroativa (lição das Stories 1, 4 e 5).
+- O critério de pronto de story que toque scraping ou integração externa exige ao menos uma execução real contra o serviço (não só fixtures), com ao menos uma música com capotraste e uma sem (lição de B1 e B2 da retrospectiva).

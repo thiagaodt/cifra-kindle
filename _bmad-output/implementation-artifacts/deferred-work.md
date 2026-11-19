@@ -15,3 +15,19 @@
 - source_spec: `_bmad-output/specs/spec-cifra-kindle/stories/5-enviar-para-o-kindle.md`
   summary: `config/env.ts` `toNumber` não rejeita valores negativos/`Infinity` (ex.: `PORT=-1`).
   evidence: Pré-existente da Story 1; Story 5 só reusa o helper. Deferido no review.
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/stories/2-buscar-cifra-por-musica.md`
+  summary: `scraper/cifraclub_search.py` faz `requests.get` próprio, sem a validação de host/redirect da Story 3 (`_buscar_soup` em `cifraclub_tons.py`); o scraper tem dois caminhos HTTP independentes (achado A2 da retrospectiva).
+  evidence: `scraper/cifraclub_search.py:45` vs `scraper/cifraclub_tons.py:78-113`. A busca bate numa API de busca fixa, risco baixo. Melhoria futura = unificar o acesso HTTP num único helper validado.
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/stories/6-suporte-a-capotraste.md`
+  summary: A busca (`cifraclub_search`) pode devolver o slug de um medley sem cifra (ex.: `legiao-urbana/pais-e-filhos`), que agora falha com 502 claro em `/tons`; a cifra existe em outra URL (`/legiao-urbana/pais-filhos/`).
+  evidence: Não verificado: hipótese levantada ao resolver B3 da retrospectiva. Verificar rodando `GET /buscar` com "Legião Urbana Pais e Filhos" contra o Cifra Club real.
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/SPEC.md`
+  summary: Limitação aceita (B2): o rótulo de tom do Cifra Club não é validado contra os acordes impressos; em Yellow (Coldplay) o botão diz E e o conteúdo está em B, então "Tom C" mostra acordes de G (deslocamento constante nas 12 versões).
+  evidence: Decisão por delegação em 2026-11-19 ("mata todos os action items"): manter C-3 (confiar no rótulo), sem heurística de dedução pelos acordes. O Thiago pode sobrescrever. Risco: leitura errada no palco para músicas com rótulo errado na origem.
+
+- source_spec: `_bmad-output/specs/spec-cifra-kindle/SPEC.md`
+  summary: Pendente: validar o envio real ao Kindle (CAP-3 e CAP-4 no aparelho), incluindo tom de abertura, links entre tons e alinhamento.
+  evidence: Retrospectiva, item de ação 3. A verificação rodou só contra SMTP local descartável. Depende do Thiago: preencher `SMTP_USER`, `SMTP_PASS`, `KINDLE_EMAIL_TO` no `.env` e cadastrar o Approved Sender (C-11).
