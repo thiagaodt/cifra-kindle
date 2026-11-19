@@ -1,77 +1,182 @@
 # Adaptador de Cifras para Kindle
 
-Projeto pessoal e solo de Thiago: buscar uma música no Cifra Club, transpor
-automaticamente para os 12 tons e receber um único EPUB navegável no Kindle
-via Send-to-Kindle. Ver `_bmad-output/specs/spec-cifra-kindle/SPEC.md` para o
-contrato completo (capabilities, constraints, non-goals).
+> Busca uma cifra no Cifra Club, transpõe para os 12 tons e envia um único EPUB navegável para o Kindle por e-mail (Send-to-Kindle).
 
-> **Uso pessoal e sem fins comerciais.** Este projeto não é afiliado ao Cifra Club nem à
-> Amazon. Ele busca, no momento do uso, cifras que você mesmo pediu, para leitura
-> pessoal no seu Kindle. Não armazena catálogo, não redistribui conteúdo e as fixtures de
-> teste têm a letra truncada. Quem usar é responsável por respeitar os Termos de Uso do
-> Cifra Club e os direitos autorais das músicas. Licença do código: [MIT](LICENSE).
+**EN:** Personal tool that fetches a song's chord sheet from Cifra Club, collects it in all 12 chromatic
+keys and bundles them into a single EPUB with internal links (so you change key by tapping a link on the
+Kindle, with no extra download). The file is emailed to the Kindle through SMTP. Node.js/Express + Postgres
+API, Python/FastAPI scraper and a Next.js front-end.
 
-Esta story (1) entrega só o scaffolding: 4 serviços de pé (Postgres, Express,
-Next.js, FastAPI) com health checks, sem nenhuma rota de negócio ainda.
+## Sobre
 
-## Setup
+Projeto pessoal e solo, feito para ler cifras no Kindle e trocar de tom na hora, sem sair do livro. O EPUB
+abre no tom original da música e traz um seletor com os 12 tons; cada tom é uma página, ligada às outras por
+links internos.
 
-1. Copie o `.env` de exemplo e ajuste se precisar:
+> **Uso pessoal e sem fins comerciais.** Este projeto não é afiliado ao Cifra Club nem à Amazon. Ele busca,
+> no momento do uso, cifras que você mesmo pediu, para leitura pessoal no seu Kindle. Não armazena catálogo,
+> não redistribui conteúdo e as fixtures de teste têm a letra truncada. Quem usar é responsável por respeitar
+> os Termos de Uso do Cifra Club e os direitos autorais das músicas.
 
-   ```sh
-   cp .env.example .env
-   ```
+## Funcionalidades
 
-2. Suba o Postgres (só o banco; API/front/scraper rodam no host):
+- **Busca por nome ou por link:** o nome é resolvido para a URL canônica da cifra no Cifra Club; um link
+  colado é usado direto (só `https` e domínio `cifraclub.com.br`).
+- **12 tons:** os 12 tons cromáticos (C, C#, D, … B; só sustenidos, tom menor mantém o `m`). A transposição
+  é feita pelo próprio Cifra Club (`?keyShape=N`), sem transposição musical local.
+- **Capotraste:** o tom exibido é o que soa; os acordes impressos são a forma. O EPUB avisa
+  "Capotraste na Nª casa — os acordes abaixo estão na forma, não no tom que soa".
+- **EPUB único:** reflowable, com sumário e seletor de tom em cada página, fonte monooespaçada para manter
+  o alinhamento acorde/letra. Validado com o EPUBCheck oficial do W3C.
+- **Envio para o Kindle:** e-mail com o EPUB anexado por SMTP (Gmail com senha de app). Acompanhamento do
+  progresso por `GET /api/envios/:id`.
+- **Erros claros:** cifra inexistente, música só com letra (medley) e Cifra Club fora do ar viram mensagens
+  legíveis, nunca uma lista parcial de tons.
 
-   ```sh
-   npm run services:up
-   ```
+## Tecnologias
 
-3. Instale as dependências e aplique as migrations:
+- **Back-end:** Node.js 22+, TypeScript, Express 5, Knex, Zod, jszip (EPUB), nodemailer (SMTP)
+- **Banco de dados:** PostgreSQL (Docker Compose, porta 5433)
+- **Scraper:** Python 3.12, FastAPI, `curl_cffi` (fingerprint TLS do Chrome), BeautifulSoup/lxml
+- **Front-end:** Next.js (App Router) em `apps/web`, ainda um placeholder
+- **Testes:** Vitest (Node) e pytest (scraper)
+- **Validação do EPUB:** EPUBCheck 5.4.0 (W3C)
 
-   ```sh
-   npm install
-   npm run migrate
-   ```
+## Arquitetura
 
-4. Suba a API (`:3333`) e, em outro terminal, o front (`:3010`):
+O back-end segue camadas: **rotas → controllers → services → repositories/integrations**. Os schemas do Zod
+validam a entrada. O scraper é um serviço separado, consumido pela camada `integrations`.
 
-   ```sh
-   npm run dev
-   npm --prefix apps/web install
-   npm --prefix apps/web run dev
-   ```
+```
+server.ts              # sobe o Express (e confere se as migrations já rodaram)
+app.ts                 # Express, rotas e tratamento de erro
+routes/                # /api/musicas e /api/envios
+controllers/           # traduz HTTP para chamadas de service
+services/              # pipeline: busca → 12 tons → EPUB → envio
+repositories/          # SQL de musicas e envios (Knex)
+integrations/          # clientes do scraper e do SMTP
+schemas/               # validação com Zod
+migrations/            # Knex
+scripts/               # migrate e epubcheck
+scraper/               # FastAPI: /buscar e /tons no Cifra Club
+apps/web/              # front-end Next.js
+tests/                 # Vitest
+```
 
-5. Suba o scraper FastAPI (`:8000`) — veja `scraper/` (requer Python 3.12; no Windows, veja a seção Solução de problemas abaixo):
+Fluxo de um envio:
 
-   ```sh
-   cd scraper
-   pip install -r requirements.txt
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
-   ```
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant API as API Express
+    participant DB as Postgres
+    participant SC as Scraper FastAPI
+    participant CC as Cifra Club
+    participant K as Kindle (SMTP)
+    U->>API: POST /api/musicas (nome ou link)
+    API->>DB: cria o envio PENDENTE
+    API-->>U: 202 { envioId }
+    API->>SC: GET /buscar (se for nome)
+    SC->>CC: busca a URL da cifra
+    API->>SC: POST /tons (URL)
+    SC->>CC: 12 requisições com ?keyShape=N
+    SC-->>API: 12 versões de tom
+    API->>API: monta o EPUB
+    API->>K: envia o EPUB por e-mail
+    API->>DB: envio CONCLUIDO (ou ERRO com mensagem)
+    U->>API: GET /api/envios/:id (polling)
+```
 
-### Tudo em Docker (alternativa ao passo 4/5)
+## Como rodar
 
-Com o `.env` já criado (passo 1), sobe os 4 serviços com autoreload:
+### Pré-requisitos
+
+- Node.js 22 ou mais recente
+- Docker (para o Postgres)
+- Python 3.12 (para o scraper; no Windows, veja a seção Solução de problemas)
+- Para o envio real: conta Gmail com senha de app e o e-mail do Kindle (Approved Sender)
+
+### Variáveis de ambiente
+
+Copie `.env.example` para `.env` e ajuste:
+
+```sh
+cp .env.example .env
+```
+
+| Variável | Para que serve | Exemplo |
+| --- | --- | --- |
+| `NODE_ENV` | Ambiente | `development` |
+| `PORT` | Porta da API | `3333` |
+| `DATABASE_URL` | Conexão com o Postgres | veja `.env.example` |
+| `DATABASE_URL_TEST` | Banco usado nos testes | veja `.env.example` |
+| `SCRAPER_BASE_URL` | Endereço do scraper | `http://localhost:8000` |
+| `SMTP_HOST` / `SMTP_PORT` | Servidor SMTP | `smtp.gmail.com` / `587` |
+| `SMTP_USER` / `SMTP_PASS` | Conta remetente e senha de app | sua conta Gmail e a senha de app |
+| `KINDLE_EMAIL_TO` | E-mail do seu Kindle | `seu-nome@kindle.com` |
+
+O remetente (`SMTP_USER`) precisa estar na lista de **e-mails aprovados** da sua conta Amazon. O `.env`
+nunca é versionado.
+
+### Banco de dados
+
+```sh
+npm run services:up   # sobe só o Postgres
+npm install
+npm run migrate
+```
+
+### Back-end e front-end
+
+```sh
+npm run dev                          # API em http://localhost:3333
+npm --prefix apps/web install
+npm --prefix apps/web run dev        # front em http://localhost:3010
+```
+
+### Scraper
+
+```sh
+cd scraper
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Tudo em Docker (alternativa)
+
+Com o `.env` criado, sobe os 4 serviços com autoreload:
 
 ```sh
 npm run docker:dev
 ```
 
-Front em `http://localhost:3010`, API em `http://localhost:3333/api/health`,
-scraper em `http://localhost:8000/`.
+Front em `http://localhost:3010`, API em `http://localhost:3333/api/health`, scraper em
+`http://localhost:8000/`.
+
+## Uso da API
+
+Envia uma música pelo nome ou por um link do Cifra Club (exatamente um dos dois):
+
+```sh
+curl -X POST http://localhost:3333/api/musicas \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"the scientist coldplay"}'
+# 202 {"envioId":"<uuid>"}
+
+curl http://localhost:3333/api/envios/<uuid>
+```
+
+O envio passa pelos status `pendente → buscando → transpondo → gerando → enviando → concluido`, ou termina em `erro` com a mensagem do motivo.
 
 ## Solução de problemas
 
 ### Scraper fora do Docker: versão do Python
 
-A imagem do scraper usa `python:3.12-slim` (ver `scraper/Dockerfile.dev`), então
-use Python 3.12 no venv local.
+A imagem do scraper usa `python:3.12-slim` (ver `scraper/Dockerfile.dev`), então use Python 3.12 no venv
+local.
 
-Python 3.15 ainda não funciona: `uvicorn[standard]` puxa `pyyaml`, que não compila
-nessa versão, e `pip install -r requirements.txt` falha. O Docker não é afetado,
-porque usa a própria imagem Python.
+Python 3.15 ainda não funciona: `uvicorn[standard]` puxa `pyyaml`, que não compila nessa versão, e
+`pip install -r requirements.txt` falha. O Docker não é afetado, porque usa a própria imagem Python.
 
 1. Crie o venv a partir da raiz do projeto (com Python 3.12 instalado no Windows):
 
@@ -85,8 +190,8 @@ porque usa a própria imagem Python.
    scraper\.venv\Scripts\Activate.ps1
    ```
 
-   No cmd, use `scraper\.venv\Scripts\activate.bat`. Se o PowerShell bloquear o
-   script, rode uma vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+   No cmd, use `scraper\.venv\Scripts\activate.bat`. Se o PowerShell bloquear o script, rode uma vez
+   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
 3. Instale as dependências e suba o scraper:
 
@@ -96,20 +201,19 @@ porque usa a própria imagem Python.
    uvicorn main:app --port 8000
    ```
 
-**Contorno** se o `pip install -r requirements.txt` continuar falhando: instale
-as dependências sem o extra `[standard]` do uvicorn:
+**Contorno** se o `pip install -r requirements.txt` continuar falhando: instale as dependências sem o
+extra `[standard]` do uvicorn:
 
 ```powershell
 pip install fastapi uvicorn "pydantic>=2" requests curl_cffi beautifulsoup4 lxml
 ```
 
-Sem `uvicorn[standard]`, o `--reload` usa o StatReload, que detecta mudanças
-mais devagar.
+Sem `uvicorn[standard]`, o `--reload` usa o StatReload, que detecta mudanças mais devagar.
 
-### BMAD: scripts com `uv`
+### Scripts do BMAD com `uv`
 
-Os scripts do BMAD em `.claude/skills/*/scripts` rodam com `uv run`. Se o `uv`
-não estiver instalado, instale no PowerShell:
+Os scripts do BMAD em `.claude/skills/*/scripts` rodam com `uv run`. Se o `uv` não estiver instalado, instale
+no PowerShell:
 
 ```powershell
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
@@ -117,23 +221,22 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 Documentação: https://docs.astral.sh/uv/
 
-## Verificação
+## Testes
 
-- `npm run typecheck` — sem erros.
-- `npm run migrate` — aplica as 2 migrations (`musicas`, `envios`) sem erro.
-- `npm run dev` + `curl http://localhost:3333/api/health` — HTTP 200.
-- `docker compose -f docker-compose.dev.yml --profile app up --build` — os 3
-  serviços (api/web/scraper) sobem saudáveis; Postgres sobe sempre (fora do
-  perfil `app`).
+```sh
+npm run typecheck   # tsc --noEmit
+npm test            # Vitest (back-end)
+cd scraper && pytest
+```
 
-Boot da API contra um Postgres sem migrations falha alto (nunca migra
-sozinho) — ver `database/migrationGuard.ts`.
+O boot da API contra um Postgres sem migrations falha alto (nunca migra sozinho), veja
+`database/migrationGuard.ts`.
 
 ### Validar o EPUB (EPUBCheck)
 
-`npm run epubcheck` gera EPUBs sintéticos (sem capo, capo + tom menor com sustenido, linhas de
-60 e 80 colunas) e os valida com o EPUBCheck oficial do W3C. Falha com erro ou aviso inesperado;
-o aviso `NAV-011` (sumário em ordem cromática, spine abrindo no tom original) é aceito de propósito.
+`npm run epubcheck` gera EPUBs sintéticos (sem capo, capo + tom menor com sustenido, linhas de 60 e 80
+colunas) e os valida com o EPUBCheck oficial do W3C. Falha com erro ou aviso inesperado; o aviso `NAV-011`
+(sumário em ordem cromática, spine abrindo no tom original) é aceito de propósito.
 
 Precisa de Java e do jar, que fica em `tools/` (ignorado pelo git):
 
@@ -142,7 +245,28 @@ gh release download v5.4.0 --repo w3c/epubcheck --pattern "epubcheck-5.4.0.zip" 
 cd tools/epubcheck && unzip epubcheck-5.4.0.zip
 ```
 
-O EPUBCheck só valida a **estrutura**. Para ver como cada aparelho renderiza (largura de tela,
-corte de linha larga, fonte), abra os arquivos de `tools/epubcheck/amostras/` no
-[Kindle Previewer](https://www.amazon.com/Kindle-Previewer/b?node=21381691011) e escolha vários
-perfis de dispositivo. Cifras reais têm a linha mais larga entre ~33 e ~60 colunas.
+O EPUBCheck só valida a **estrutura**. Para ver como cada aparelho renderiza (largura de tela, corte de
+linha larga, fonte), abra os arquivos de `tools/epubcheck/amostras/` no
+[Kindle Previewer](https://www.amazon.com/Kindle-Previewer/b?node=21381691011) e escolha vários perfis de
+dispositivo. Cifras reais têm a linha mais larga entre ~33 e ~60 colunas.
+
+## Limitações conhecidas
+
+- O rótulo de tom do Cifra Club às vezes discorda dos acordes impressos (ex.: Yellow, rótulo E, acordes em
+  B). O projeto confia no rótulo.
+- Medleys sem cifra (o Cifra Club redireciona para `/letra/`) falham com mensagem clara.
+- O front-end ainda é um placeholder; hoje o uso é pela API.
+- Testado só em um Kindle básico de última geração. Outros modelos dependem de abrir os EPUBs de amostra no
+  Kindle Previewer.
+
+## O que aprendi
+
+<!-- TODO: pedir ao Thiago de 3 a 5 aprendizados técnicos deste projeto -->
+
+## Licença
+
+Distribuído sob a licença MIT. Veja o arquivo [LICENSE](LICENSE).
+
+## Autor
+
+Thiago Enrico Costa Cardoso — [LinkedIn](https://www.linkedin.com/in/thiago-enrico-costa-cardoso/) · [Portfólio](https://teccdev.com.br/)
